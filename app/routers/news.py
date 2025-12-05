@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_
+from sqlalchemy import select, and_
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
 
 from app.database import get_db
 from app.models.news import News
-from app.schemas.news import NewsCreate, NewsResponse, NewsUpdate
+from app.schemas.news import NewsCreate, NewsRead
 
 router = APIRouter()
 
@@ -15,7 +15,7 @@ router = APIRouter()
 async def health_check():
     return {"status": "ok"}
 
-@router.post("/news", response_model=NewsResponse, status_code=201)
+@router.post("/news", response_model=NewsRead, status_code=201)
 async def create_news(news_data: NewsCreate, db: AsyncSession = Depends(get_db)):
     """Crear una nueva noticia"""
     new_news = News(**news_data.model_dump())
@@ -24,12 +24,12 @@ async def create_news(news_data: NewsCreate, db: AsyncSession = Depends(get_db))
     await db.refresh(new_news)
     return new_news
 
-@router.get("/news", response_model=list[NewsResponse])
+@router.get("/news", response_model=list[NewsRead])
 async def list_news(
     category: Optional[str] = Query(None, description="Filtrar por categoría"),
-    from_date: Optional[datetime] = Query(None, alias="from", description="Fecha desde (published_at >=)"),
-    to_date: Optional[datetime] = Query(None, alias="to", description="Fecha hasta (published_at <=)"),
     q: Optional[str] = Query(None, description="Buscar en título"),
+    from_date: Optional[datetime] = Query(None, description="Fecha desde (published_at >=)"),
+    to_date: Optional[datetime] = Query(None, description="Fecha hasta (published_at <=)"),
     db: AsyncSession = Depends(get_db)
 ):
     """Listar noticias con filtros opcionales"""
@@ -58,10 +58,10 @@ async def list_news(
     news_list = result.scalars().all()
     return news_list
 
-@router.get("/news/{news_id}", response_model=NewsResponse)
-async def get_news(news_id: UUID, db: AsyncSession = Depends(get_db)):
+@router.get("/news/{id}", response_model=NewsRead)
+async def get_news(id: UUID, db: AsyncSession = Depends(get_db)):
     """Obtener una noticia por ID"""
-    query = select(News).where(News.id == news_id)
+    query = select(News).where(News.id == id)
     result = await db.execute(query)
     news = result.scalar_one_or_none()
     
@@ -69,4 +69,3 @@ async def get_news(news_id: UUID, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Noticia no encontrada")
     
     return news
-

@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from alembic import context
 import os
 from dotenv import load_dotenv
+from urllib.parse import urlparse, urlunparse, parse_qs, urlencode
 
 # Cargar variables de entorno
 load_dotenv()
@@ -31,9 +32,57 @@ target_metadata = Base.metadata
 # ... etc.
 
 
+def normalize_database_url(url: str) -> str:
+    """
+    Normalizar la URL de base de datos para asyncpg.
+    
+    - Convierte postgresql:// a postgresql+asyncpg://
+    - Elimina parámetros incompatibles con asyncpg (como sslmode, channel_binding)
+    - asyncpg maneja SSL automáticamente, no necesita sslmode
+    """
+    if not url:
+        return url
+    
+    # Convertir postgresql:// a postgresql+asyncpg://
+    if url.startswith("postgresql://") and not url.startswith("postgresql+asyncpg://"):
+        url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    
+    # Parsear la URL para limpiar parámetros incompatibles
+    parsed = urlparse(url)
+    
+    # Si tiene query parameters, limpiarlos
+    if parsed.query:
+        query_params = parse_qs(parsed.query, keep_blank_values=True)
+        
+        # asyncpg no acepta sslmode, channel_binding, etc. como query params
+        # Eliminar parámetros incompatibles
+        incompatible_params = ['sslmode', 'channel_binding']
+        for param in incompatible_params:
+            query_params.pop(param, None)
+        
+        # Reconstruir query string solo si quedan parámetros válidos
+        if query_params:
+            new_query = urlencode(query_params, doseq=True)
+        else:
+            new_query = ""
+        
+        # Reconstruir URL sin los parámetros incompatibles
+        url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment
+        ))
+    
+    return url
+
+
 def get_url():
-    """Obtener DATABASE_URL desde variables de entorno"""
-    return os.getenv("DATABASE_URL", "")
+    """Obtener y normalizar DATABASE_URL desde variables de entorno"""
+    raw_url = os.getenv("DATABASE_URL", "")
+    return normalize_database_url(raw_url)
 
 
 def run_migrations_offline() -> None:
@@ -67,8 +116,8 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 
-async def run_migrations_online() -> None:
-    """Run migrations in 'online' mode.
+async def run_async_migrations() -> None:
+    """Run migrations in async mode.
 
     In this scenario we need to create an Engine
     and associate a connection with the context.
@@ -93,5 +142,4 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     import asyncio
-    asyncio.run(run_migrations_online())
-
+    asyncio.run(run_async_migrations())

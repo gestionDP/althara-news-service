@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -15,24 +15,14 @@ class NewsBase(BaseModel):
     used_in_social: bool = False
 
 class NewsCreate(NewsBase):
+    """Schema para crear una noticia. No incluye id, created_at, updated_at"""
     pass
 
-class NewsUpdate(BaseModel):
-    title: Optional[str] = None
-    source: Optional[str] = None
-    url: Optional[str] = None
-    published_at: Optional[datetime] = None
-    category: Optional[str] = None
-    raw_summary: Optional[str] = None
-    althara_summary: Optional[str] = None
-    tags: Optional[str] = None
-    used_in_social: Optional[bool] = None
-
-class NewsResponse(NewsBase):
+class NewsRead(NewsBase):
+    """Schema para leer una noticia. Incluye todos los campos"""
     id: UUID
     created_at: datetime
     updated_at: datetime
 
     class Config:
         from_attributes = True
-
