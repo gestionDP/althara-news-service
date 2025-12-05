@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, func
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
 
 from app.database import get_db
 from app.models.news import News
-from app.schemas.news import NewsCreate, NewsRead
+from app.schemas.news import NewsCreate, NewsRead, PaginatedResponse
 
 router = APIRouter()
 
@@ -24,16 +24,26 @@ async def create_news(news_data: NewsCreate, db: AsyncSession = Depends(get_db))
     await db.refresh(new_news)
     return new_news
 
-@router.get("/news", response_model=list[NewsRead])
+@router.get("/news", response_model=PaginatedResponse[NewsRead])
 async def list_news(
     category: Optional[str] = Query(None, description="Filtrar por categoría"),
     q: Optional[str] = Query(None, description="Buscar en título"),
     from_date: Optional[datetime] = Query(None, description="Fecha desde (published_at >=)"),
     to_date: Optional[datetime] = Query(None, description="Fecha hasta (published_at <=)"),
+    used_in_social: Optional[bool] = Query(None, description="Filtrar por usado en redes (true/false)"),
+    limit: int = Query(50, ge=1, le=200, description="Número máximo de noticias a devolver (1-200)"),
+    offset: int = Query(0, ge=0, description="Número de noticias a saltar para paginación"),
     db: AsyncSession = Depends(get_db)
 ):
-    """Listar noticias con filtros opcionales"""
+    """
+    Listar noticias con filtros opcionales y paginación.
+    
+    Por defecto devuelve las últimas 50 noticias (las más recientes primero).
+    Usa `limit` y `offset` para paginación.
+    """
+    # Query base
     query = select(News)
+    count_query = select(func.count()).select_from(News)
     
     conditions = []
     
@@ -49,14 +59,39 @@ async def list_news(
     if q:
         conditions.append(News.title.ilike(f"%{q}%"))
     
+    # Filtro por used_in_social si se especifica
+    if used_in_social is not None:
+        conditions.append(News.used_in_social == used_in_social)
+    
+    # Aplicar condiciones a ambas queries
     if conditions:
         query = query.where(and_(*conditions))
+        count_query = count_query.where(and_(*conditions))
     
+    # Ordenar por fecha (más recientes primero)
     query = query.order_by(News.published_at.desc())
     
+    # Aplicar paginación
+    query = query.limit(limit).offset(offset)
+    
+    # Ejecutar queries
     result = await db.execute(query)
     news_list = result.scalars().all()
-    return news_list
+    
+    # Obtener total
+    total_result = await db.execute(count_query)
+    total = total_result.scalar_one()
+    
+    # Calcular si hay más resultados
+    has_more = (offset + limit) < total
+    
+    return PaginatedResponse[NewsRead](
+        items=news_list,
+        total=total,
+        limit=limit,
+        offset=offset,
+        has_more=has_more
+    )
 
 @router.get("/news/{id}", response_model=NewsRead)
 async def get_news(id: UUID, db: AsyncSession = Depends(get_db)):

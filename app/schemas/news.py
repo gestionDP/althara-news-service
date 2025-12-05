@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Generic, TypeVar, List
 from uuid import UUID
 
 class NewsBase(BaseModel):
@@ -23,6 +23,21 @@ class NewsRead(NewsBase):
     id: UUID
     created_at: datetime
     updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Schema para respuesta paginada
+T = TypeVar('T')
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Schema para respuestas paginadas"""
+    items: List[T]
+    total: int
+    limit: int
+    offset: int
+    has_more: bool
 
     class Config:
         from_attributes = True
