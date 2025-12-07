@@ -7,10 +7,13 @@ NOTA: Idealista NO tiene API de noticias, por eso usamos fuentes RSS.
 import re
 import html
 import feedparser
+import httpx
+from bs4 import BeautifulSoup
+from readability import Document
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timezone
-from typing import Dict
+from typing import Dict, Optional
 from app.models.news import News
 from app.constants import NewsCategory
 
@@ -169,6 +172,52 @@ def _is_relevant_to_spain_europe(title: str, summary: str = None) -> bool:
     return True
 
 
+async def _extract_article_content(url: str) -> Optional[str]:
+    """
+    Extrae el contenido completo del artículo desde la URL usando scraping.
+    
+    Args:
+        url: URL del artículo
+        
+    Returns:
+        Texto del artículo completo o None si falla
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+            response = await client.get(url, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            })
+            response.raise_for_status()
+            
+            # Usar readability para extraer el contenido principal del artículo
+            doc = Document(response.text)
+            content_html = doc.summary()
+            
+            # Parsear HTML y extraer solo texto
+            soup = BeautifulSoup(content_html, 'html.parser')
+            
+            # Eliminar scripts, estilos y elementos no deseados
+            for element in soup(["script", "style", "nav", "header", "footer", "aside", "iframe"]):
+                element.decompose()
+            
+            # Obtener texto limpio
+            text = soup.get_text(separator=' ', strip=True)
+            
+            # Limpiar espacios múltiples
+            text = re.sub(r'\s+', ' ', text)
+            text = text.strip()
+            
+            # Limitar a 5000 caracteres máximo (para no saturar la BD)
+            if len(text) > 5000:
+                text = text[:5000] + "..."
+            
+            return text if text and len(text) > 50 else None  # Mínimo 50 caracteres para considerar válido
+            
+    except Exception:
+        # Si falla el scraping, devolver None (usaremos el resumen del RSS como fallback)
+        return None
+
+
 def _parse_published_date(entry) -> datetime:
     """
     Intenta parsear la fecha de publicación de una entrada RSS.
@@ -263,9 +312,44 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                 # Parsear fecha
                 published_at = _parse_published_date(entry)
                 
-                # Limpiar resumen de HTML
+                # Intentar obtener contenido completo del RSS primero
+                # Algunos feeds incluyen content:encoded o content con el artículo completo
+                full_content = None
+                
+                # Buscar content o content:encoded en el entry
+                if hasattr(entry, 'content') and entry.content:
+                    # Algunos feeds tienen content como lista
+                    if isinstance(entry.content, list) and len(entry.content) > 0:
+                        full_content = entry.content[0].get('value', '')
+                    elif isinstance(entry.content, str):
+                        full_content = entry.content
+                
+                # Buscar content:encoded (algunos feeds lo usan)
+                if not full_content:
+                    for key in entry.keys():
+                        if 'content' in key.lower() or 'encoded' in key.lower():
+                            full_content = entry[key]
+                            break
+                
+                # Decidir qué contenido usar (prioridad: RSS completo > scraping > resumen RSS)
                 raw_summary = None
-                if temp_summary:
+                
+                # Prioridad 1: Contenido completo del RSS (si está disponible)
+                if full_content:
+                    raw_summary = _clean_html(full_content)
+                    # Si el contenido completo del RSS es muy corto (< 200 chars), 
+                    # probablemente no es el artículo completo, intentar scraping
+                    if len(raw_summary) < 200:
+                        raw_summary = None  # Resetear para intentar scraping
+                
+                # Prioridad 2: Intentar scraping del artículo (solo si no hay contenido completo del RSS)
+                if not raw_summary and link:
+                    scraped_content = await _extract_article_content(link)
+                    if scraped_content:
+                        raw_summary = scraped_content
+                
+                # Prioridad 3: Usar resumen del RSS como fallback
+                if not raw_summary and temp_summary:
                     raw_summary = _clean_html(temp_summary)
                 
                 # Verificar si ya existe una noticia con la misma URL
