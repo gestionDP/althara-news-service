@@ -5,7 +5,7 @@ NOTA: Idealista NO tiene API de noticias, por eso solo usamos fuentes RSS.
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, delete, func
 from app.database import get_db
 from app.ingestion.rss_ingestor import ingest_rss_sources
 from app.models.news import News
@@ -139,5 +139,33 @@ async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
         "ingested": total_inserted,
         "adapted": adapted_count,
         "sources_processed": len([v for v in ingest_results.values() if v > 0])
+    }
+
+
+@router.delete("/clean-all")
+async def clean_all_news(db: AsyncSession = Depends(get_db)):
+    """
+    Elimina TODAS las noticias de la base de datos.
+    
+    ⚠️ ADVERTENCIA: Esta operación es irreversible.
+    Útil para limpiar y re-ingerir con nuevas mejoras.
+    
+    Returns:
+        JSON con el número de noticias eliminadas
+    """
+    # Contar noticias antes de eliminar
+    count_stmt = select(func.count()).select_from(News)
+    count_result = await db.execute(count_stmt)
+    total_count = count_result.scalar_one()
+    
+    # Eliminar todas las noticias
+    delete_stmt = delete(News)
+    await db.execute(delete_stmt)
+    await db.commit()
+    
+    return {
+        "status": "ok",
+        "deleted": total_count,
+        "message": f"Se eliminaron {total_count} noticias de la base de datos"
     }
 

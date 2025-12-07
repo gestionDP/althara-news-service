@@ -4,6 +4,8 @@ Ingestor genérico de noticias desde fuentes RSS.
 Parsea feeds RSS legales y los inserta en la base de datos.
 NOTA: Idealista NO tiene API de noticias, por eso usamos fuentes RSS.
 """
+import re
+import html
 import feedparser
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -13,9 +15,7 @@ from app.models.news import News
 from app.constants import NewsCategory
 
 
-# Configuración de fuentes RSS reales y legales
 RSS_SOURCES = [
-    # Fuentes de noticias inmobiliarias generales
     {
         "name": "Expansion Inmobiliario",
         "url": "https://e00-expansion.uecdn.es/rss/inmobiliario.xml",
@@ -71,14 +71,102 @@ RSS_SOURCES = [
         "source": "Interempresas",
         "description": "Noticias sobre construcción"
     },
-    {
-        "name": "Plataforma Arquitectura",
-        "url": "https://www.archdaily.mx/mx/rss",
-        "default_category": NewsCategory.NOVEDADES_CONSTRUCCION,
-        "source": "ArchDaily",
-        "description": "Noticias de arquitectura y construcción"
-    },
+    # ArchDaily eliminado: es internacional y no garantiza solo España/Europa
+    # Si necesitas noticias de arquitectura específicas de España, considerar:
+    # - Plataforma Arquitectura (si tiene feed específico de España)
+    # - O agregar filtrado por ubicación en el futuro
 ]
+
+
+def _clean_html(text: str) -> str:
+    """
+    Limpia HTML de un texto, extrayendo solo el contenido de texto puro.
+    
+    Args:
+        text: Texto que puede contener HTML
+        
+    Returns:
+        Texto limpio sin tags HTML ni entidades HTML
+    """
+    if not text:
+        return ""
+    
+    # Convertir entidades HTML a caracteres normales (&amp; -> &, etc.)
+    text = html.unescape(text)
+    
+    # Remover tags HTML (ej: <p>, <a href="...">, etc.)
+    text = re.sub(r'<[^>]+>', '', text)
+    
+    # Limpiar espacios múltiples y saltos de línea
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Limpiar espacios al inicio y final
+    text = text.strip()
+    
+    return text
+
+
+def _is_relevant_to_spain_europe(title: str, summary: str = None) -> bool:
+    """
+    Filtra noticias para mantener solo las relevantes a España y Europa.
+    
+    Args:
+        title: Título de la noticia
+        summary: Resumen de la noticia (opcional)
+        
+    Returns:
+        True si la noticia es relevante para España/Europa, False en caso contrario
+    """
+    if not title:
+        return False
+    
+    # Combinar título y resumen para búsqueda
+    text_to_check = title.lower()
+    if summary:
+        text_to_check += " " + summary.lower()
+    
+    # Palabras clave que indican España/Europa
+    spain_keywords = [
+        "españa", "español", "española", "españoles",
+        "madrid", "barcelona", "valencia", "sevilla", "bilbao",
+        "andalucía", "cataluña", "madrileño", "catalán",
+        "boe", "gobierno español", "ministerio"
+    ]
+    
+    europe_keywords = [
+        "europa", "europeo", "europea", "europeos",
+        "ue", "unión europea", "bruselas",
+        "alemania", "francia", "italia", "portugal",
+        "países bajos", "bélgica"
+    ]
+    
+    # Excluir palabras que indican otros países/regiones
+    exclude_keywords = [
+        "méxico", "mexicano", "mexicana", "cdmx",
+        "argentina", "argentino", "buenos aires",
+        "colombia", "colombiano", "bogotá",
+        "chile", "chileno", "santiago",
+        "estados unidos", "eeuu", "usa", "nueva york", "los angeles",
+        "asia", "china", "japón", "india"
+    ]
+    
+    # Si contiene palabras de exclusión, descartar
+    for keyword in exclude_keywords:
+        if keyword in text_to_check:
+            return False
+    
+    # Si contiene palabras de España o Europa, incluir
+    for keyword in spain_keywords + europe_keywords:
+        if keyword in text_to_check:
+            return True
+    
+    # Para fuentes españolas específicas (Expansion, El País, etc.), 
+    # asumimos que son relevantes por defecto
+    # Esto se puede ajustar según la fuente
+    
+    # Si no hay indicadores claros, por defecto incluir
+    # (las fuentes RSS ya están filtradas por ser españolas)
+    return True
 
 
 def _parse_published_date(entry) -> datetime:
@@ -161,15 +249,24 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                 if not title or not link:
                     continue
                 
+                # Extraer resumen temporalmente para el filtro
+                temp_summary = None
+                if hasattr(entry, 'summary') and entry.summary:
+                    temp_summary = entry.summary
+                elif hasattr(entry, 'description') and entry.description:
+                    temp_summary = entry.description
+                
+                # Filtrar noticias: solo España y Europa
+                if not _is_relevant_to_spain_europe(title, temp_summary):
+                    continue  # Saltar esta noticia
+                
                 # Parsear fecha
                 published_at = _parse_published_date(entry)
                 
-                # Extraer resumen si existe
+                # Limpiar resumen de HTML
                 raw_summary = None
-                if hasattr(entry, 'summary'):
-                    raw_summary = entry.summary
-                elif hasattr(entry, 'description'):
-                    raw_summary = entry.description
+                if temp_summary:
+                    raw_summary = _clean_html(temp_summary)
                 
                 # Verificar si ya existe una noticia con la misma URL
                 stmt = select(News).where(News.url == link)

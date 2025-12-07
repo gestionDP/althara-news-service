@@ -6,6 +6,8 @@ analítico y profesional de Althara para uso en redes sociales.
 """
 from __future__ import annotations
 
+import re
+import html
 from datetime import datetime
 from textwrap import shorten
 from typing import Optional
@@ -19,6 +21,35 @@ ALTHARA_CLOSERS = [
 ]
 
 
+def _clean_html(text: str) -> str:
+    """
+    Limpia HTML de un texto, extrayendo solo el contenido de texto puro.
+    
+    Args:
+        text: Texto que puede contener HTML
+        
+    Returns:
+        Texto limpio sin tags HTML ni entidades HTML
+    """
+    if not text:
+        return ""
+    
+    # Convertir entidades HTML a caracteres normales (&amp; -> &, etc.)
+    text = html.unescape(text)
+    
+    # Remover tags HTML (ej: <p>, <a href="...">, etc.)
+    # Regex: <[^>]+> busca cualquier cosa entre < y >
+    text = re.sub(r'<[^>]+>', '', text)
+    
+    # Limpiar espacios múltiples y saltos de línea
+    text = re.sub(r'\s+', ' ', text)
+    
+    # Limpiar espacios al inicio y final
+    text = text.strip()
+    
+    return text
+
+
 def _build_fact_line(title: str, raw_summary: Optional[str]) -> str:
     """
     Construye la primera línea: descripción fría del hecho.
@@ -26,7 +57,9 @@ def _build_fact_line(title: str, raw_summary: Optional[str]) -> str:
     base = title.strip()
     
     if raw_summary:
-        combined = f"{title.strip()}. {raw_summary.strip()}"
+        # Limpiar HTML del raw_summary antes de combinarlo
+        cleaned_summary = _clean_html(raw_summary)
+        combined = f"{title.strip()}. {cleaned_summary}"
         # recortamos para no generar un bloque eterno
         fact = shorten(combined, width=220, placeholder="…")
     else:
