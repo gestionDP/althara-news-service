@@ -9,7 +9,6 @@ import html
 import feedparser
 import httpx
 from bs4 import BeautifulSoup
-from readability import Document
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from datetime import datetime, timezone
@@ -189,19 +188,48 @@ async def _extract_article_content(url: str) -> Optional[str]:
             })
             response.raise_for_status()
             
-            # Usar readability para extraer el contenido principal del artículo
-            doc = Document(response.text)
-            content_html = doc.summary()
-            
-            # Parsear HTML y extraer solo texto
-            soup = BeautifulSoup(content_html, 'html.parser')
+            # Parsear HTML
+            soup = BeautifulSoup(response.text, 'html.parser')
             
             # Eliminar scripts, estilos y elementos no deseados
-            for element in soup(["script", "style", "nav", "header", "footer", "aside", "iframe"]):
+            for element in soup(["script", "style", "nav", "header", "footer", "aside", "iframe", "noscript"]):
                 element.decompose()
             
-            # Obtener texto limpio
-            text = soup.get_text(separator=' ', strip=True)
+            # Buscar el contenido principal del artículo
+            # Intentar encontrar el artículo usando selectores comunes
+            article = None
+            
+            # Selectores comunes para el contenido principal
+            article_selectors = [
+                'article',
+                '.article-body',
+                '.article-content',
+                '.post-content',
+                '.entry-content',
+                '[role="article"]',
+                'main article',
+                '.content article',
+                '#main article'
+            ]
+            
+            for selector in article_selectors:
+                article = soup.select_one(selector)
+                if article:
+                    break
+            
+            # Si no se encuentra article, buscar divs con clase común de contenido
+            if not article:
+                for div in soup.find_all('div', class_=re.compile(r'(content|article|post|entry)', re.I)):
+                    if len(div.get_text()) > 300:  # Si tiene bastante texto, probablemente es el contenido
+                        article = div
+                        break
+            
+            # Si aún no se encuentra, usar el body completo (menos ideal pero funcional)
+            if not article:
+                article = soup.find('body') or soup
+            
+            # Extraer texto limpio
+            text = article.get_text(separator=' ', strip=True) if article else soup.get_text(separator=' ', strip=True)
             
             # Limpiar espacios múltiples
             text = re.sub(r'\s+', ' ', text)
