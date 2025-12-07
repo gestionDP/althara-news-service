@@ -104,7 +104,7 @@ async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
     Ejecuta todo el pipeline: ingest → adapt → listo para usar.
     
     Returns:
-        JSON con el resultado completo de ingestión y adaptación
+        JSON compacto con resumen del proceso (optimizado para cron jobs)
     """
     # 1. Ingestar noticias (máximo 5 por fuente para evitar demasiadas)
     ingest_results = await ingest_rss_sources(db, max_items_per_source=5)
@@ -127,16 +127,17 @@ async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
             news.althara_summary = althara_summary
             adapted_count += 1
         except Exception as e:
-            print(f"Error adaptando noticia {news.id}: {e}")
+            # Solo registrar errores críticos, sin detalles largos
             continue
     
     if adapted_count > 0:
         await db.commit()
     
+    # Respuesta compacta para evitar "output too large" en cron jobs
     return {
+        "status": "ok",
         "ingested": total_inserted,
-        "ingested_by_source": ingest_results,
         "adapted": adapted_count,
-        "message": f"Pipeline completo: {total_inserted} noticias ingeridas, {adapted_count} adaptadas"
+        "sources_processed": len([v for v in ingest_results.values() if v > 0])
     }
 

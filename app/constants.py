@@ -92,3 +92,4 @@ CATEGORY_LABELS = {
     NewsCategory.CONSTRUCCION_MODULAR: "Construcción modular",
 }
 
+

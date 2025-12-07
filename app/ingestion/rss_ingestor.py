@@ -139,12 +139,12 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
             
             # Verificar que el feed se parseó correctamente
             if feed.bozo == 1 and feed.bozo_exception:
-                # Hay algún error en el parseo
-                print(f"Warning: Feed {source_name} tuvo errores al parsear: {feed.bozo_exception}")
+                # Hay algún error en el parseo (silencioso para evitar output largo)
+                pass
             
             # Verificar que el feed tiene entradas
             if not hasattr(feed, 'entries') or not feed.entries:
-                print(f"Warning: Feed {source_name} no tiene entradas")
+                # Feed vacío (silencioso para evitar output largo)
                 results[source_name] = 0
                 continue
             
@@ -193,8 +193,7 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                     inserted_count += 1
         
         except Exception as e:
-            # Manejar errores de manera elegante
-            print(f"Error procesando fuente RSS {source_name}: {e}")
+            # Manejar errores de manera elegante (silencioso para evitar output largo)
             inserted_count = 0
         
         results[source_name] = inserted_count

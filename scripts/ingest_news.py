@@ -79,3 +79,4 @@ if __name__ == "__main__":
     result = asyncio.run(ingest_and_adapt())
     sys.exit(0 if result.get("success") else 1)
 
+
