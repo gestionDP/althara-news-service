@@ -202,8 +202,13 @@ async def _extract_article_content(url: str) -> Optional[str]:
             })
             response.raise_for_status()
             
-            # Parsear HTML
-            soup = BeautifulSoup(response.text, 'html.parser')
+            # Asegurar que el contenido está en UTF-8
+            # BeautifulSoup maneja la codificación automáticamente, pero lo forzamos
+            if response.encoding:
+                response.encoding = 'utf-8'
+            
+            # Parsear HTML con codificación explícita
+            soup = BeautifulSoup(response.text, 'html.parser', from_encoding='utf-8')
             
             # Eliminar scripts, estilos y elementos no deseados
             for element in soup(["script", "style", "nav", "header", "footer", "aside", "iframe", "noscript"]):

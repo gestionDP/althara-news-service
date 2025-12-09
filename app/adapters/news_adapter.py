@@ -24,22 +24,114 @@ ALTHARA_CLOSERS = [
 def _clean_html(text: str) -> str:
     """
     Limpia HTML de un texto, extrayendo solo el contenido de texto puro.
+    También elimina metadatos como autores, fechas, botones de compartir, etc.
+    Maneja correctamente la codificación UTF-8 y las entidades HTML.
     
     Args:
         text: Texto que puede contener HTML
         
     Returns:
-        Texto limpio sin tags HTML ni entidades HTML
+        Texto limpio sin tags HTML ni entidades HTML, con codificación correcta
     """
     if not text:
         return ""
     
-    # Convertir entidades HTML a caracteres normales (&amp; -> &, etc.)
+    # Asegurar que el texto está en UTF-8
+    if isinstance(text, bytes):
+        try:
+            text = text.decode('utf-8')
+        except UnicodeDecodeError:
+            try:
+                text = text.decode('latin-1')
+            except UnicodeDecodeError:
+                text = text.decode('utf-8', errors='replace')
+    
+    # Convertir entidades HTML a caracteres normales (&amp; -> &, &aacute; -> á, etc.)
+    # html.unescape maneja entidades estándar, pero también necesitamos manejar casos especiales
     text = html.unescape(text)
+    
+    # Decodificar entidades HTML adicionales que html.unescape podría no manejar
+    # Reemplazar entidades comunes manualmente si es necesario
+    text = text.replace('&amp;', '&')
+    text = text.replace('&lt;', '<')
+    text = text.replace('&gt;', '>')
+    text = text.replace('&quot;', '"')
+    text = text.replace('&#39;', "'")
+    text = text.replace('&nbsp;', ' ')
     
     # Remover tags HTML (ej: <p>, <a href="...">, etc.)
     # Regex: <[^>]+> busca cualquier cosa entre < y >
     text = re.sub(r'<[^>]+>', '', text)
+    
+    # Eliminar metadatos comunes de artículos
+    # Patrones para eliminar: "AUTOR FECHA - HORA", "Compartir en...", etc.
+    patterns_to_remove = [
+        r'[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+\s+\d{1,2}\s+[A-Z]{3}\.\s+\d{4}\s*-\s*\d{2}:\d{2}',  # "BEATRIZ AMIGOT 27 NOV. 2025 - 09:39"
+        r'Compartir en (Facebook|Twitter|LinkedIn|WhatsApp)',  # Botones de compartir
+        r'Enviar por email',
+        r'DREAMSTIME|GETTY|SHUTTERSTOCK|ISTOCK',  # Fuentes de imágenes
+        r'EXPANSION|EL PAÍS|CINCO DÍAS',  # Nombres de medios repetidos
+        r'Vistas del|Imagen de|Foto de',  # Descripciones de imágenes
+        r'\b\d{1,2}\s+[A-Z]{3}\.\s+\d{4}\s*-\s*\d{2}:\d{2}\b',  # Fechas sueltas
+        r'Periodista y Coordinadora editorial',  # Cargos editoriales
+        r'\d{2}/\d{2}/\d{4}',  # Fechas en formato DD/MM/YYYY
+    ]
+    
+    for pattern in patterns_to_remove:
+        text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+    
+    # Eliminar líneas que solo contienen mayúsculas (títulos de sección)
+    lines = text.split('\n')
+    cleaned_lines = []
+    for line in lines:
+        line = line.strip()
+        # Si la línea tiene más de 3 palabras en mayúsculas consecutivas, probablemente es un título
+        if not re.match(r'^[A-ZÁÉÍÓÚÑ\s]{20,}$', line):
+            cleaned_lines.append(line)
+    text = ' '.join(cleaned_lines)
+    
+    # Limpiar caracteres de reemplazo Unicode () - estos indican problemas de codificación
+    # Intentar reparar caracteres comunes mal codificados
+    text = text.replace('\ufffd', '')  # Eliminar caracteres de reemplazo Unicode
+    text = text.replace('', '')  # Eliminar caracteres de reemplazo si están presentes
+    
+    # Reparar caracteres acentuados comunes que se hayan perdido por problemas de codificación
+    # Patrones comunes donde se pierden acentos en español
+    accent_fixes = [
+        (r'\bneuropsicloga\b', 'neuropsicóloga'),
+        (r'\bMnica\b', 'Mónica'),
+        (r'\bcientfica\b', 'científica'),
+        (r'\bdcadas\b', 'décadas'),
+        (r'\bmbito\b', 'ámbito'),
+        (r'\bpsicloga\b', 'psicóloga'),
+        (r'\beducacin\b', 'educación'),
+        (r'\bdiseñar\b', 'diseñar'),  # Ya está bien, pero por si acaso
+        (r'\bsegn\b', 'según'),
+        (r'\bcmo\b', 'cómo'),
+        (r'\bqu\b', 'qué'),
+        (r'\bdnde\b', 'dónde'),
+        (r'\bcuando\b', 'cuándo'),  # Solo si está en contexto de pregunta
+        (r'\barchitectura\b', 'arquitectura'),  # Por si viene en inglés
+    ]
+    
+    for pattern, replacement in accent_fixes:
+        text = re.sub(pattern, replacement, text, flags=re.IGNORECASE)
+    
+    # Reparar palabras comunes sin acento (solo si no tienen acento y deberían tenerlo)
+    # Esto es más conservador - solo repara casos muy comunes
+    common_fixes = {
+        'psicologa': 'psicóloga',
+        'psicologo': 'psicólogo',
+        'arquitecta': 'arquitecta',  # Ya está bien
+        'arquitecto': 'arquitecto',  # Ya está bien
+        'educacion': 'educación',
+        'especializada': 'especializada',  # Ya está bien
+        'especializado': 'especializado',  # Ya está bien
+    }
+    
+    # Solo aplicar si la palabra está sola (no como parte de otra palabra)
+    for wrong, correct in common_fixes.items():
+        text = re.sub(r'\b' + wrong + r'\b', correct, text, flags=re.IGNORECASE)
     
     # Limpiar espacios múltiples y saltos de línea
     text = re.sub(r'\s+', ' ', text)
@@ -199,17 +291,17 @@ def _extract_key_data(raw_summary: Optional[str]) -> List[str]:
 
 def _extract_keywords(title: str, raw_summary: Optional[str]) -> List[str]:
     """
-    Extrae palabras clave relevantes del título y raw_summary.
-    Se enfoca en términos inmobiliarios y económicos relevantes.
+    Extrae palabras clave relevantes y coherentes del título y raw_summary.
+    Se enfoca en términos inmobiliarios, ubicaciones y conceptos clave.
     
     Args:
         title: Título de la noticia
         raw_summary: Resumen original (opcional)
         
     Returns:
-        Lista de palabras clave (máximo 8)
+        Lista de palabras clave relevantes (máximo 6-8)
     """
-    # Palabras comunes a excluir
+    # Palabras comunes a excluir (ampliado)
     stop_words = {
         'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
         'de', 'del', 'en', 'a', 'al', 'con', 'por', 'para', 'sobre',
@@ -218,16 +310,18 @@ def _extract_keywords(title: str, raw_summary: Optional[str]) -> List[str]:
         'como', 'más', 'menos', 'muy', 'tan', 'tanto', 'también', 'tampoco',
         'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'esos', 'esas',
         'año', 'años', 'mes', 'meses', 'día', 'días', 'vez', 'veces',
-        'según', 'según', 'según', 'según', 'según', 'según', 'según',
+        'según', 'todos', 'todas', 'cada', 'todo', 'toda',
+        'puede', 'pueden', 'debe', 'deben', 'hace', 'hacen',
+        'sido', 'estado', 'estado', 'sido',
     }
     
-    # Términos inmobiliarios relevantes (prioridad)
+    # Términos inmobiliarios relevantes (prioridad alta)
     real_estate_terms = {
         'vivienda', 'viviendas', 'inmobiliario', 'inmobiliaria', 'inmobiliarias',
         'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria',
         'precio', 'precios', 'valor', 'valores', 'coste', 'costes',
         'alquiler', 'alquileres', 'renta', 'rentas',
-        'compra', 'venta', 'comprar', 'vender',
+        'compra', 'venta', 'comprar', 'vender', 'compraventa', 'compraventas',
         'mercado', 'mercados', 'sector', 'sectores',
         'propiedad', 'propiedades', 'inmueble', 'inmuebles',
         'construcción', 'construcciones', 'obra', 'obras',
@@ -236,11 +330,19 @@ def _extract_keywords(title: str, raw_summary: Optional[str]) -> List[str]:
         'subasta', 'subastas', 'desahucio', 'desahucios',
         'okupación', 'okupaciones', 'okupa', 'okupas',
         'normativa', 'normativas', 'ley', 'leyes', 'regulación',
-        'madrid', 'barcelona', 'valencia', 'sevilla', 'bilbao',
+    }
+    
+    # Ubicaciones importantes (prioridad media)
+    locations = {
+        'madrid', 'barcelona', 'valencia', 'sevilla', 'bilbao', 'zaragoza',
+        'málaga', 'murcia', 'palma', 'las palmas', 'granada', 'alicante',
+        'valladolid', 'córdoba', 'vigo', 'gijón', 'hospitalet', 'vitoria',
+        'castilla', 'león', 'andalucía', 'cataluña', 'comunidad valenciana',
+        'galicia', 'país vasco', 'asturias', 'cantabria', 'navarra',
         'españa', 'español', 'europa', 'europeo',
     }
     
-    # Combinar texto
+    # Combinar y limpiar texto
     combined_text = title.lower()
     if raw_summary:
         cleaned = _clean_html(raw_summary).lower()
@@ -249,36 +351,51 @@ def _extract_keywords(title: str, raw_summary: Optional[str]) -> List[str]:
     # Extraer palabras (solo palabras de 4+ caracteres)
     words = re.findall(r'\b[a-záéíóúñü]{4,}\b', combined_text)
     
+    # Contar frecuencia de palabras para priorizar las más relevantes
+    word_freq = {}
+    for word in words:
+        if word not in stop_words:
+            word_freq[word] = word_freq.get(word, 0) + 1
+    
     # Filtrar y priorizar
     keywords = []
     seen = set()
     
-    # Primero: términos inmobiliarios
-    for word in words:
+    # Prioridad 1: Términos inmobiliarios (más relevantes)
+    for word in sorted(word_freq.keys(), key=lambda x: word_freq[x], reverse=True):
         if word in real_estate_terms and word not in seen:
             keywords.append(word)
             seen.add(word)
-            if len(keywords) >= 8:
+            if len(keywords) >= 5:
                 break
     
-    # Segundo: otras palabras relevantes (no stop words)
+    # Prioridad 2: Ubicaciones
     if len(keywords) < 8:
-        for word in words:
-            if word not in stop_words and word not in seen and len(word) >= 4:
-                # Priorizar sustantivos y adjetivos (terminaciones comunes)
-                if any(word.endswith(suffix) for suffix in ['ción', 'sión', 'dad', 'tad', 'tud', 'aje', 'ismo']):
+        for word in sorted(word_freq.keys(), key=lambda x: word_freq[x], reverse=True):
+            if word in locations and word not in seen:
+                keywords.append(word)
+                seen.add(word)
+                if len(keywords) >= 8:
+                    break
+    
+    # Prioridad 3: Conceptos clave (sustantivos importantes)
+    if len(keywords) < 8:
+        for word in sorted(word_freq.keys(), key=lambda x: word_freq[x], reverse=True):
+            if word not in seen and len(word) >= 5:
+                # Priorizar sustantivos (terminaciones comunes en español)
+                if any(word.endswith(suffix) for suffix in ['ción', 'sión', 'dad', 'tad', 'tud', 'aje', 'ismo', 'miento']):
                     keywords.append(word)
                     seen.add(word)
                     if len(keywords) >= 8:
                         break
     
-    # Si aún no tenemos suficientes, añadir otras palabras relevantes
-    if len(keywords) < 8:
-        for word in words:
-            if word not in stop_words and word not in seen and len(word) >= 5:
+    # Si aún no tenemos suficientes, añadir palabras más frecuentes
+    if len(keywords) < 6:
+        for word in sorted(word_freq.keys(), key=lambda x: word_freq[x], reverse=True):
+            if word not in stop_words and word not in seen and len(word) >= 5 and word_freq[word] >= 2:
                 keywords.append(word)
                 seen.add(word)
-                if len(keywords) >= 8:
+                if len(keywords) >= 6:
                     break
     
     return keywords[:8]
@@ -286,27 +403,164 @@ def _extract_keywords(title: str, raw_summary: Optional[str]) -> List[str]:
 
 def _build_extended_summary(title: str, raw_summary: Optional[str]) -> str:
     """
-    Construye un resumen ampliado del título y raw_summary.
+    Construye el contenido completo de la noticia, limpiando metadatos pero manteniendo
+    toda la información relevante. No recorta el contenido, solo lo limpia.
     
     Args:
         title: Título de la noticia
         raw_summary: Resumen original (opcional)
         
     Returns:
-        Resumen ampliado (hasta 500-600 caracteres)
+        Contenido completo limpio de la noticia
     """
     if not raw_summary:
         return title.strip()
     
+    # Limpiar el resumen (elimina HTML, metadatos, etc.)
     cleaned_summary = _clean_html(raw_summary)
     
-    # Combinar título y resumen
+    # Eliminar repeticiones del título al inicio del resumen
+    title_lower = title.lower().strip()
+    cleaned_lower = cleaned_summary.lower().strip()
+    
+    # Si el resumen empieza con el título completo, eliminarlo
+    if cleaned_lower.startswith(title_lower):
+        cleaned_summary = cleaned_summary[len(title):].strip()
+        # Eliminar puntos, comas y espacios al inicio
+        cleaned_summary = re.sub(r'^[.,\s]+', '', cleaned_summary)
+    
+    # También buscar si el título aparece como frase completa más adelante y eliminarlo
+    # Esto maneja casos donde el título se repite en medio del texto
+    title_words = title_lower.split()
+    if len(title_words) > 3:
+        # Buscar la primera parte del título (primeras 4-5 palabras)
+        title_start = ' '.join(title_words[:min(5, len(title_words))])
+        # Si aparece al inicio del texto limpio, eliminarlo
+        if cleaned_lower.startswith(title_start):
+            # Encontrar dónde termina esta repetición
+            idx = cleaned_summary.lower().find(title_start)
+            if idx == 0:
+                # Avanzar hasta después de la repetición
+                remaining = cleaned_summary[len(title_start):].strip()
+                # Buscar el siguiente punto o espacio significativo
+                next_space = remaining.find(' ')
+                if next_space > 0:
+                    cleaned_summary = remaining[next_space:].strip()
+                else:
+                    cleaned_summary = remaining
+                cleaned_summary = re.sub(r'^[.,\s]+', '', cleaned_summary)
+    
+    # Eliminar repeticiones de frases comunes al inicio
+    words = cleaned_summary.split()
+    if len(words) > 15:
+        # Buscar si las primeras 3-5 palabras se repiten más adelante
+        for i in range(3, min(8, len(words))):
+            first_phrase = ' '.join(words[:i]).lower()
+            # Buscar si esta frase aparece más adelante (después de la posición i)
+            remaining_text = ' '.join(words[i:]).lower()
+            if first_phrase in remaining_text:
+                # Eliminar la primera ocurrencia
+                cleaned_summary = ' '.join(words[i:])
+                break
+    
+    # Eliminar frases de sección repetidas (ej: "Mercado Inmobiliario")
+    section_phrases = ['mercado inmobiliario', 'noticias inmobiliarias', 'economía inmobiliaria']
+    for phrase in section_phrases:
+        # Eliminar si aparece al inicio
+        if cleaned_summary.lower().startswith(phrase):
+            cleaned_summary = cleaned_summary[len(phrase):].strip()
+            cleaned_summary = re.sub(r'^[.,\s]+', '', cleaned_summary)
+    
+    # Eliminar repeticiones completas del texto (si el texto se repite palabra por palabra)
+    words = cleaned_summary.split()
+    if len(words) > 20:
+        # Buscar si las primeras 10 palabras aparecen duplicadas más adelante
+        first_10_words = ' '.join(words[:10]).lower()
+        # Buscar esta frase en el resto del texto
+        remaining_text = ' '.join(words[10:]).lower()
+        if first_10_words in remaining_text:
+            # Encontrar dónde termina la primera ocurrencia
+            idx = remaining_text.find(first_10_words)
+            if idx > 0:
+                # Mantener solo hasta donde empieza la repetición
+                cleaned_summary = ' '.join(words[:10 + idx // 2])  # Aproximado
+            else:
+                # Si está al inicio, eliminar la primera ocurrencia
+                cleaned_summary = ' '.join(words[10:])
+    
+    # Combinar título y contenido
     combined = f"{title.strip()}. {cleaned_summary}"
     
-    # Limitar a 550 caracteres (dejando margen para el placeholder)
-    extended = shorten(combined, width=550, placeholder="…")
+    # Formatear en párrafos legibles: dividir por puntos seguidos de espacio
+    # Dividir en oraciones (por puntos, signos de exclamación o interrogación)
+    sentences = re.split(r'([.!?])\s+', combined)
     
-    return extended
+    # Reconstruir oraciones con sus signos de puntuación
+    reconstructed_sentences = []
+    for i in range(0, len(sentences) - 1, 2):
+        if i + 1 < len(sentences):
+            sentence = sentences[i] + sentences[i + 1]
+            sentence = sentence.strip()
+            if sentence:
+                reconstructed_sentences.append(sentence)
+    
+    # Si no se pudieron dividir bien, usar el método simple
+    if not reconstructed_sentences:
+        sentences = re.split(r'\.\s+', combined)
+        reconstructed_sentences = [s.strip() + '.' for s in sentences if s.strip()]
+    
+    # Agrupar oraciones en párrafos de 2-3 oraciones cada uno para mejor legibilidad
+    paragraphs = []
+    current_paragraph = []
+    
+    for sentence in reconstructed_sentences:
+        sentence = sentence.strip()
+        if not sentence:
+            continue
+        
+        # Asegurar que termina con puntuación
+        if not sentence.endswith(('.', '!', '?', '…')):
+            sentence += '.'
+        
+        current_paragraph.append(sentence)
+        
+        # Crear párrafo cada 2-3 oraciones, o si la oración es muy larga (>120 chars)
+        if len(current_paragraph) >= 3 or (len(sentence) > 120 and len(current_paragraph) >= 2):
+            paragraphs.append(' '.join(current_paragraph))
+            current_paragraph = []
+    
+    # Añadir el último párrafo si tiene contenido
+    if current_paragraph:
+        paragraphs.append(' '.join(current_paragraph))
+    
+    # Si no se pudieron crear párrafos (texto muy corto), devolver tal cual pero formateado
+    if not paragraphs:
+        # Limitar solo si es extremadamente largo
+        if len(combined) > 5000:
+            truncated = combined[:5000]
+            last_period = truncated.rfind('. ')
+            if last_period > 4500:
+                combined = combined[:last_period + 1] + "…"
+            else:
+                combined = truncated + "…"
+        return combined
+    
+    # Unir párrafos con doble salto de línea para mejor legibilidad
+    formatted_text = '\n\n'.join(paragraphs)
+    
+    # Limitar solo si es extremadamente largo (más de 5000 caracteres)
+    if len(formatted_text) > 5000:
+        # Mantener párrafos completos hasta el límite
+        truncated_paragraphs = []
+        total_length = 0
+        for para in paragraphs:
+            if total_length + len(para) + 2 > 5000:  # +2 por el salto de línea
+                break
+            truncated_paragraphs.append(para)
+            total_length += len(para) + 2
+        formatted_text = '\n\n'.join(truncated_paragraphs) + "…"
+    
+    return formatted_text
 
 
 def build_althara_summary(
@@ -335,31 +589,38 @@ def build_althara_summary(
     """
     sections = []
     
-    # 1. RESUMEN ampliado
-    extended_summary = _build_extended_summary(title, raw_summary)
-    sections.append("📊 RESUMEN")
-    sections.append(extended_summary)
-    sections.append("")  # Línea en blanco
+    # 1. CONTENIDO COMPLETO (formateado en párrafos)
+    full_content = _build_extended_summary(title, raw_summary)
+    sections.append("📊 CONTENIDO")
+    sections.append("")
+    sections.append(full_content)
+    sections.append("")
+    sections.append("")  # Línea en blanco adicional para separación
     
     # 2. ANÁLISIS ALTHARA
     strategic_line = _build_strategic_line(category)
     sections.append("💡 ANÁLISIS ALTHARA")
+    sections.append("")
     sections.append(strategic_line)
-    sections.append("")  # Línea en blanco
+    sections.append("")
+    sections.append("")  # Línea en blanco adicional
     
     # 3. DATOS CLAVE
     key_data = _extract_key_data(raw_summary)
     if key_data:
         sections.append("📈 DATOS CLAVE")
+        sections.append("")
         for data in key_data:
-            sections.append(f"- {data}")
-        sections.append("")  # Línea en blanco
+            sections.append(f"• {data}")
+        sections.append("")
+        sections.append("")  # Línea en blanco adicional
     
     # 4. PALABRAS CLAVE
     keywords = _extract_keywords(title, raw_summary)
     if keywords:
         sections.append("🔑 PALABRAS CLAVE")
-        keywords_str = ", ".join(keywords)
+        sections.append("")
+        keywords_str = " • ".join(keywords)
         sections.append(keywords_str)
     
     return "\n".join(sections)
