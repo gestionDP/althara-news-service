@@ -10,7 +10,7 @@ import re
 import html
 from datetime import datetime
 from textwrap import shorten
-from typing import Optional
+from typing import Optional, List
 
 # Frases de cierre "genéricas" de Althara
 ALTHARA_CLOSERS = [
@@ -150,6 +150,165 @@ def _pick_closer(index_seed: Optional[int] = None) -> str:
     return ALTHARA_CLOSERS[idx]
 
 
+def _extract_key_data(raw_summary: Optional[str]) -> List[str]:
+    """
+    Extrae datos clave del raw_summary: números, porcentajes, precios, fechas importantes.
+    
+    Args:
+        raw_summary: Resumen original de la noticia
+        
+    Returns:
+        Lista de strings con datos clave encontrados (máximo 5)
+    """
+    if not raw_summary:
+        return []
+    
+    key_data = []
+    text = _clean_html(raw_summary)
+    
+    # Patrones para extraer datos relevantes
+    patterns = [
+        # Porcentajes: "5%", "12,5%", "aumentó un 15%"
+        (r'(\d+[.,]?\d*\s*%)', 'Porcentaje'),
+        # Precios: "€500.000", "1.2 millones", "€1.500/m²"
+        (r'(€\s*\d+[.,]?\d*[.,]?\d*\s*(?:millones?|miles?|/m²)?)', 'Precio'),
+        # Números grandes: "1.500 viviendas", "2 millones de euros"
+        (r'(\d+[.,]?\d*[.,]?\d*\s*(?:millones?|miles?|millones? de|viviendas?|propiedades?|euros?))', 'Cantidad'),
+        # Años: "2025", "en 2024"
+        (r'(\b(?:20\d{2}|19\d{2})\b)', 'Año'),
+        # Variaciones: "subió un 10%", "bajó 5 puntos"
+        (r'((?:subió|bajó|aumentó|disminuyó|creció|descendió)\s+(?:un\s+)?\d+[.,]?\d*\s*(?:%|puntos?))', 'Variación'),
+    ]
+    
+    found_data = set()  # Para evitar duplicados
+    
+    for pattern, label in patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            data_point = match.group(1).strip()
+            # Limpiar y formatear
+            data_point = re.sub(r'\s+', ' ', data_point)
+            if data_point and len(data_point) < 50:  # Evitar matches muy largos
+                found_data.add(data_point)
+    
+    # Convertir a lista y limitar a 5 elementos más relevantes
+    key_data = list(found_data)[:5]
+    
+    return key_data
+
+
+def _extract_keywords(title: str, raw_summary: Optional[str]) -> List[str]:
+    """
+    Extrae palabras clave relevantes del título y raw_summary.
+    Se enfoca en términos inmobiliarios y económicos relevantes.
+    
+    Args:
+        title: Título de la noticia
+        raw_summary: Resumen original (opcional)
+        
+    Returns:
+        Lista de palabras clave (máximo 8)
+    """
+    # Palabras comunes a excluir
+    stop_words = {
+        'el', 'la', 'los', 'las', 'un', 'una', 'unos', 'unas',
+        'de', 'del', 'en', 'a', 'al', 'con', 'por', 'para', 'sobre',
+        'es', 'son', 'fue', 'fueron', 'ser', 'estar', 'tener', 'haber',
+        'que', 'cual', 'cuales', 'quien', 'quienes', 'donde', 'cuando',
+        'como', 'más', 'menos', 'muy', 'tan', 'tanto', 'también', 'tampoco',
+        'este', 'esta', 'estos', 'estas', 'ese', 'esa', 'esos', 'esas',
+        'año', 'años', 'mes', 'meses', 'día', 'días', 'vez', 'veces',
+        'según', 'según', 'según', 'según', 'según', 'según', 'según',
+    }
+    
+    # Términos inmobiliarios relevantes (prioridad)
+    real_estate_terms = {
+        'vivienda', 'viviendas', 'inmobiliario', 'inmobiliaria', 'inmobiliarias',
+        'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria',
+        'precio', 'precios', 'valor', 'valores', 'coste', 'costes',
+        'alquiler', 'alquileres', 'renta', 'rentas',
+        'compra', 'venta', 'comprar', 'vender',
+        'mercado', 'mercados', 'sector', 'sectores',
+        'propiedad', 'propiedades', 'inmueble', 'inmuebles',
+        'construcción', 'construcciones', 'obra', 'obras',
+        'promoción', 'promociones', 'desarrollo', 'desarrollos',
+        'inversión', 'inversiones', 'inversor', 'inversores',
+        'subasta', 'subastas', 'desahucio', 'desahucios',
+        'okupación', 'okupaciones', 'okupa', 'okupas',
+        'normativa', 'normativas', 'ley', 'leyes', 'regulación',
+        'madrid', 'barcelona', 'valencia', 'sevilla', 'bilbao',
+        'españa', 'español', 'europa', 'europeo',
+    }
+    
+    # Combinar texto
+    combined_text = title.lower()
+    if raw_summary:
+        cleaned = _clean_html(raw_summary).lower()
+        combined_text += " " + cleaned
+    
+    # Extraer palabras (solo palabras de 4+ caracteres)
+    words = re.findall(r'\b[a-záéíóúñü]{4,}\b', combined_text)
+    
+    # Filtrar y priorizar
+    keywords = []
+    seen = set()
+    
+    # Primero: términos inmobiliarios
+    for word in words:
+        if word in real_estate_terms and word not in seen:
+            keywords.append(word)
+            seen.add(word)
+            if len(keywords) >= 8:
+                break
+    
+    # Segundo: otras palabras relevantes (no stop words)
+    if len(keywords) < 8:
+        for word in words:
+            if word not in stop_words and word not in seen and len(word) >= 4:
+                # Priorizar sustantivos y adjetivos (terminaciones comunes)
+                if any(word.endswith(suffix) for suffix in ['ción', 'sión', 'dad', 'tad', 'tud', 'aje', 'ismo']):
+                    keywords.append(word)
+                    seen.add(word)
+                    if len(keywords) >= 8:
+                        break
+    
+    # Si aún no tenemos suficientes, añadir otras palabras relevantes
+    if len(keywords) < 8:
+        for word in words:
+            if word not in stop_words and word not in seen and len(word) >= 5:
+                keywords.append(word)
+                seen.add(word)
+                if len(keywords) >= 8:
+                    break
+    
+    return keywords[:8]
+
+
+def _build_extended_summary(title: str, raw_summary: Optional[str]) -> str:
+    """
+    Construye un resumen ampliado del título y raw_summary.
+    
+    Args:
+        title: Título de la noticia
+        raw_summary: Resumen original (opcional)
+        
+    Returns:
+        Resumen ampliado (hasta 500-600 caracteres)
+    """
+    if not raw_summary:
+        return title.strip()
+    
+    cleaned_summary = _clean_html(raw_summary)
+    
+    # Combinar título y resumen
+    combined = f"{title.strip()}. {cleaned_summary}"
+    
+    # Limitar a 550 caracteres (dejando margen para el placeholder)
+    extended = shorten(combined, width=550, placeholder="…")
+    
+    return extended
+
+
 def build_althara_summary(
     title: str,
     raw_summary: Optional[str],
@@ -157,11 +316,13 @@ def build_althara_summary(
     seed: Optional[int] = None,
 ) -> str:
     """
-    Construye un texto breve en tres líneas con el tono y estructura de Althara.
+    Construye un resumen completo estructurado con el tono y estilo de Althara.
     
-    - Línea 1: hecho frío.
-    - Línea 2: lectura estratégica según categoría.
-    - Línea 3: cierre en clave de asimetría / acceso / timing.
+    Estructura:
+    - RESUMEN: Contenido ampliado del raw_summary
+    - ANÁLISIS ALTHARA: Lectura estratégica según categoría
+    - DATOS CLAVE: Números, porcentajes, precios, fechas relevantes
+    - PALABRAS CLAVE: Términos relevantes extraídos
     
     Args:
         title: Título de la noticia
@@ -170,10 +331,35 @@ def build_althara_summary(
         seed: Semilla para rotar los cierres (opcional)
         
     Returns:
-        Texto adaptado al tono Althara (3 líneas)
+        Texto adaptado al tono Althara con estructura completa
     """
-    fact_line = _build_fact_line(title, raw_summary)
-    strategic_line = _build_strategic_line(category)
-    closer_line = _pick_closer(seed)
+    sections = []
     
-    return "\n".join([fact_line, strategic_line, closer_line])
+    # 1. RESUMEN ampliado
+    extended_summary = _build_extended_summary(title, raw_summary)
+    sections.append("📊 RESUMEN")
+    sections.append(extended_summary)
+    sections.append("")  # Línea en blanco
+    
+    # 2. ANÁLISIS ALTHARA
+    strategic_line = _build_strategic_line(category)
+    sections.append("💡 ANÁLISIS ALTHARA")
+    sections.append(strategic_line)
+    sections.append("")  # Línea en blanco
+    
+    # 3. DATOS CLAVE
+    key_data = _extract_key_data(raw_summary)
+    if key_data:
+        sections.append("📈 DATOS CLAVE")
+        for data in key_data:
+            sections.append(f"- {data}")
+        sections.append("")  # Línea en blanco
+    
+    # 4. PALABRAS CLAVE
+    keywords = _extract_keywords(title, raw_summary)
+    if keywords:
+        sections.append("🔑 PALABRAS CLAVE")
+        keywords_str = ", ".join(keywords)
+        sections.append(keywords_str)
+    
+    return "\n".join(sections)
