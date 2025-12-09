@@ -80,6 +80,15 @@ RSS_SOURCES = [
         "source": "Interempresas",
         "description": "Noticias sobre construcción"
     },
+    
+    # Medios locales - Baleares
+    {
+        "name": "Última Hora",
+        "url": "https://www.ultimahora.es/feed.rss",
+        "default_category": NewsCategory.NOTICIAS_INMOBILIARIAS,
+        "source": "Última Hora",
+        "description": "Noticias locales de Baleares: alquiler, vivienda, mercado inmobiliario"
+    },
     # ArchDaily eliminado: es internacional y no garantiza solo España/Europa
     # Si necesitas noticias de arquitectura específicas de España, considerar:
     # - Plataforma Arquitectura (si tiene feed específico de España)
@@ -139,10 +148,13 @@ def _is_relevant_to_spain_europe(title: str, summary: str = None) -> bool:
         "españa", "español", "española", "españoles",
         "madrid", "barcelona", "valencia", "sevilla", "bilbao",
         "andalucía", "cataluña", "madrileño", "catalán",
+        "baleares", "mallorca", "menorca", "ibiza", "formentera",
+        "palma", "palma de mallorca", "palma mallorca",
         "boe", "gobierno español", "ministerio",
         # Inglés
         "spain", "spanish", "madrid", "barcelona", "valencia", "seville", "bilbao",
-        "andalusia", "catalonia", "catalan"
+        "andalusia", "catalonia", "catalan",
+        "balearic", "balearic islands", "majorca", "minorca"
     ]
     
     europe_keywords = [
@@ -316,10 +328,19 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
         inserted_count = 0
         
         try:
-            # Parsear el feed RSS
-            # Nota: feedparser es síncrono, pero para feeds pequeños está bien
-            # Si necesitas async en el futuro, puedes usar httpx + feedparser
-            feed = feedparser.parse(feed_url)
+            # Parsear el feed RSS/Atom
+            # Algunos feeds requieren User-Agent, así que primero descargamos con httpx
+            # y luego parseamos con feedparser
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                response = await client.get(
+                    feed_url,
+                    headers={
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                    }
+                )
+                response.raise_for_status()
+                # Parsear el contenido descargado con feedparser
+                feed = feedparser.parse(response.text)
             
             # Verificar que el feed se parseó correctamente
             if feed.bozo == 1 and feed.bozo_exception:
