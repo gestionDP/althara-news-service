@@ -107,7 +107,7 @@ async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
         JSON compacto con resumen del proceso (optimizado para cron jobs)
     """
     # 1. Ingestar noticias (máximo 5 por fuente para evitar demasiadas)
-    ingest_results = await ingest_rss_sources(db, max_items_per_source=5)
+    ingest_results = await ingest_rss_sources(db, max_items_per_source=10)
     total_inserted = sum(ingest_results.values())
     
     # 2. Adaptar noticias pendientes

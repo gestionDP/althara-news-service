@@ -591,24 +591,16 @@ def build_althara_summary(
     
     # 1. CONTENIDO COMPLETO (formateado en párrafos)
     full_content = _build_extended_summary(title, raw_summary)
-    sections.append("📊 CONTENIDO")
+    sections.append("Content Summary")
     sections.append("")
     sections.append(full_content)
     sections.append("")
     sections.append("")  # Línea en blanco adicional para separación
-    
-    # 2. ANÁLISIS ALTHARA
-    strategic_line = _build_strategic_line(category)
-    sections.append("💡 ANÁLISIS ALTHARA")
-    sections.append("")
-    sections.append(strategic_line)
-    sections.append("")
-    sections.append("")  # Línea en blanco adicional
-    
+       
     # 3. DATOS CLAVE
     key_data = _extract_key_data(raw_summary)
     if key_data:
-        sections.append("📈 DATOS CLAVE")
+        sections.append("Key Data")
         sections.append("")
         for data in key_data:
             sections.append(f"• {data}")
@@ -618,7 +610,7 @@ def build_althara_summary(
     # 4. PALABRAS CLAVE
     keywords = _extract_keywords(title, raw_summary)
     if keywords:
-        sections.append("🔑 PALABRAS CLAVE")
+        sections.append("Key Words")
         sections.append("")
         keywords_str = " • ".join(keywords)
         sections.append(keywords_str)

@@ -124,16 +124,16 @@ def _clean_html(text: str) -> str:
     return text
 
 
-def _is_relevant_to_spain_europe(title: str, summary: str = None) -> bool:
+def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
     """
-    Filtra noticias para mantener solo las relevantes a España y Europa.
+    Filtra noticias para mantener solo las relevantes al sector inmobiliario.
     
     Args:
         title: Título de la noticia
         summary: Resumen de la noticia (opcional)
         
     Returns:
-        True si la noticia es relevante para España/Europa, False en caso contrario
+        True si la noticia es relevante al sector inmobiliario, False en caso contrario
     """
     if not title:
         return False
@@ -143,58 +143,91 @@ def _is_relevant_to_spain_europe(title: str, summary: str = None) -> bool:
     if summary:
         text_to_check += " " + summary.lower()
     
-    # Palabras clave que indican España/Europa (español e inglés)
-    spain_keywords = [
-        "españa", "español", "española", "españoles",
-        "madrid", "barcelona", "valencia", "sevilla", "bilbao",
-        "andalucía", "cataluña", "madrileño", "catalán",
-        "baleares", "mallorca", "menorca", "ibiza", "formentera",
-        "palma", "palma de mallorca", "palma mallorca",
-        "boe", "gobierno español", "ministerio",
+    # Palabras clave que indican que es una noticia inmobiliaria
+    real_estate_keywords = [
+        # Términos principales
+        'vivienda', 'viviendas', 'inmobiliario', 'inmobiliaria', 'inmobiliarias',
+        'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria',
+        'alquiler', 'alquileres', 'renta', 'rentas',
+        'precio', 'precios', 'valor', 'valores', 'coste', 'costes',
+        'compra', 'venta', 'comprar', 'vender', 'compraventa',
+        'mercado inmobiliario', 'sector inmobiliario',
+        'propiedad', 'propiedades', 'inmueble', 'inmuebles',
+        'construcción', 'construcciones', 'obra', 'obras',
+        'promoción', 'promociones', 'desarrollo inmobiliario',
+        'inversión inmobiliaria', 'inversiones inmobiliarias',
+        'subasta', 'subastas', 'desahucio', 'desahucios',
+        'okupa', 'okupas', 'okupación', 'okupaciones',
+        'normativa', 'normativas', 'ley vivienda', 'regulación vivienda',
+        'urbanismo', 'urbanización', 'urbanizaciones',
+        'suelo', 'terreno', 'solar', 'urbanizable',
+        'materiales construcción', 'coste construcción',
+        'fondo inversión', 'fondos inversión', 'socimi', 'reit',
+        'burbuja inmobiliaria', 'crisis vivienda',
+        'alquiler vacacional', 'airbnb', 'vivienda turística',
+        'vpo', 'vivienda protegida', 'vivienda social',
+        'licencia', 'licencias', 'permiso construcción',
+        'arquitectura', 'arquitecto', 'arquitecta',
+        'reforma', 'reformas', 'rehabilitación',
         # Inglés
-        "spain", "spanish", "madrid", "barcelona", "valencia", "seville", "bilbao",
-        "andalusia", "catalonia", "catalan",
-        "balearic", "balearic islands", "majorca", "minorca"
+        'property', 'properties', 'real estate', 'housing',
+        'mortgage', 'mortgages', 'rent', 'rental',
+        'construction', 'building', 'development',
+        'investment', 'investor', 'investors'
     ]
     
-    europe_keywords = [
-        "europa", "europeo", "europea", "europeos",
-        "ue", "unión europea", "bruselas",
-        "alemania", "francia", "italia", "portugal",
-        "países bajos", "bélgica",
-        # Inglés
-        "europe", "european", "eu", "european union", "brussels",
-        "germany", "france", "italy", "portugal",
-        "netherlands", "belgium"
-    ]
-    
-    # Excluir palabras que indican otros países/regiones
+    # Palabras clave que indican que NO es una noticia inmobiliaria
     exclude_keywords = [
-        "méxico", "mexicano", "mexicana", "cdmx",
-        "argentina", "argentino", "buenos aires",
-        "colombia", "colombiano", "bogotá",
-        "chile", "chileno", "santiago",
-        "estados unidos", "eeuu", "usa", "nueva york", "los angeles",
-        "asia", "china", "japón", "india"
+        # Accidentes y sucesos
+        'herido', 'heridos', 'accidente', 'accidentes', 'volcar', 'volcó',
+        'atropello', 'atropellado', 'choque', 'colisión',
+        'muerto', 'muertos', 'fallecido', 'fallecidos',
+        'detenido', 'detenidos', 'arresto', 'arrestos',
+        'robo', 'robos', 'hurto', 'hurtos',
+        # Cultura y ocio no relacionado
+        'película', 'películas', 'cine', 'actor', 'actriz',
+        'música', 'concierto', 'conciertos', 'festival',
+        'libro', 'libros', 'escritor', 'escritora',
+        'exposición', 'exposiciones', 'museo', 'museos',
+        # Deportes
+        'fútbol', 'futbol', 'partido', 'partidos', 'gol', 'goles',
+        'equipo', 'equipos', 'jugador', 'jugadores',
+        # Política general (sin relación inmobiliaria)
+        'elecciones', 'votación', 'votaciones', 'partido político',
+        # Sucesos generales
+        'incendio', 'incendios', 'inundación', 'inundaciones',
+        'temporal', 'temporales', 'lluvia', 'lluvias',
+        # Salud general
+        'hospital', 'hospitales', 'médico', 'médicos', 'enfermedad',
+        # Educación general
+        'colegio', 'colegios', 'universidad', 'universidades', 'estudiante',
+        # Tráfico y transporte (sin relación inmobiliaria)
+        'tráfico', 'trafico', 'carretera', 'carreteras', 'autopista',
+        'camión', 'camiones', 'coche', 'coches', 'vehículo', 'vehículos',
+        'mercedes', 'bmw', 'audi', 'ford', 'renault', 'seat', 'volvo',
+        'cabrio', 'todoterreno', 'automóvil', 'automóviles', 'auto',
+        # Noticias de sucesos locales sin relación
+        'pintadas', 'grafiti', 'vandalismo',
+        'homenaje', 'homenajes', 'acto', 'actos culturales',
+        # Tecnología y gadgets no relacionados
+        'smartphone', 'tablet', 'iphone', 'android', 'app', 'aplicación',
+        # Deportes y entretenimiento
+        'fútbol', 'futbol', 'baloncesto', 'tenis', 'deporte', 'deportes',
+        'partido', 'partidos', 'gol', 'goles', 'equipo', 'equipos'
     ]
     
-    # Si contiene palabras de exclusión, descartar
+    # Si contiene palabras de exclusión claras, descartar inmediatamente
     for keyword in exclude_keywords:
         if keyword in text_to_check:
             return False
     
-    # Si contiene palabras de España o Europa, incluir
-    for keyword in spain_keywords + europe_keywords:
+    # Debe contener al menos una palabra clave inmobiliaria
+    for keyword in real_estate_keywords:
         if keyword in text_to_check:
             return True
     
-    # Para fuentes españolas específicas (Expansion, El País, etc.), 
-    # asumimos que son relevantes por defecto
-    # Esto se puede ajustar según la fuente
-    
-    # Si no hay indicadores claros, por defecto incluir
-    # (las fuentes RSS ya están filtradas por ser españolas)
-    return True
+    # Si no tiene palabras clave inmobiliarias, descartar
+    return False
 
 
 async def _extract_article_content(url: str) -> Optional[str]:
@@ -277,6 +310,152 @@ async def _extract_article_content(url: str) -> Optional[str]:
         return None
 
 
+def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Optional[str]:
+    """
+    Categoriza una noticia basándose en palabras clave del título y resumen.
+    
+    Args:
+        title: Título de la noticia
+        summary: Resumen de la noticia (opcional)
+        
+    Returns:
+        Categoría detectada o None si no se encuentra ninguna coincidencia
+    """
+    from app.constants import NewsCategory
+    
+    # Combinar título y resumen para análisis
+    text_to_analyze = title.lower()
+    if summary:
+        text_to_analyze += " " + summary.lower()
+    
+    # Mapeo de palabras clave a categorías (ordenado por especificidad)
+    keyword_mapping = {
+        # Fondos e inversión
+        NewsCategory.FONDOS_INVERSION_INMOBILIARIA: [
+            'fondo de inversión', 'fondos de inversión', 'fondo inmobiliario', 'fondos inmobiliarios',
+            'socimi', 'socimis', 'reit', 'reits', 'fondo cerrado', 'fondo abierto',
+            'gestión de activos inmobiliarios', 'vehículo de inversión'
+        ],
+        NewsCategory.GRANDES_INVERSIONES_INMOBILIARIAS: [
+            'gran inversión', 'grandes inversiones', 'inversión millonaria', 'millones de inversión',
+            'mega proyecto', 'macro proyecto', 'inversión masiva', 'operación inmobiliaria',
+            'transacción millonaria', 'adquisición millonaria'
+        ],
+        NewsCategory.MOVIMIENTOS_GRANDES_TENEDORES: [
+            'gran tenedor', 'grandes tenedores', 'inversor institucional', 'inversores institucionales',
+            'fondo buitre', 'fondos buitre', 'hedge fund', 'private equity',
+            'operador inmobiliario', 'operadores inmobiliarios'
+        ],
+        NewsCategory.TOKENIZATION_ACTIVOS: [
+            'tokenización', 'tokenizacion', 'token', 'blockchain inmobiliario',
+            'criptoactivo inmobiliario', 'nft inmobiliario', 'activo tokenizado'
+        ],
+        
+        # Noticias específicas
+        NewsCategory.NOTICIAS_HIPOTECAS: [
+            'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria', 'crédito hipotecario',
+            'euribor', 'tipo de interés', 'tasa hipotecaria', 'préstamo hipotecario',
+            'subrogación', 'novación', 'cancelación hipoteca'
+        ],
+        NewsCategory.NOTICIAS_LEYES_OKUPAS: [
+            'okupa', 'okupas', 'okupación', 'okupaciones', 'ocupación ilegal',
+            'ley okupas', 'ley antiokupas', 'desalojo', 'desalojos', 'usurpación'
+        ],
+        NewsCategory.NOTICIAS_BOE_SUBASTAS: [
+            'subasta', 'subastas', 'subasta judicial', 'subasta inmobiliaria',
+            'boe subasta', 'subasta pública', 'puja', 'remate'
+        ],
+        NewsCategory.NOTICIAS_DESAHUCIOS: [
+            'desahucio', 'desahucios', 'lanzamiento', 'lanzamientos', 'ejecución hipotecaria',
+            'embargo', 'embargos', 'expulsión', 'desalojo forzoso'
+        ],
+        NewsCategory.FALTA_VIVIENDA: [
+            'falta de vivienda', 'escasez de vivienda', 'déficit habitacional',
+            'crisis de vivienda', 'problema de vivienda', 'acceso a vivienda',
+            'vivienda asequible', 'vivienda social', 'vpo', 'vivienda protegida'
+        ],
+        
+        # Precios
+        NewsCategory.PRECIOS_VIVIENDA: [
+            'precio de vivienda', 'precios de vivienda', 'precio vivienda', 'precios vivienda',
+            'precio por m²', 'precio por metro', 'evolución precios', 'precio medio',
+            'precio medio vivienda', 'coste vivienda', 'valor vivienda', 'revalorización'
+        ],
+        NewsCategory.PRECIOS_MATERIALES: [
+            'precio materiales', 'precios materiales', 'coste materiales', 'costes materiales',
+            'precio construcción', 'coste construcción', 'materiales construcción',
+            'cemento', 'acero', 'ladrillo', 'precio obra'
+        ],
+        NewsCategory.PRECIOS_SUELO: [
+            'precio suelo', 'precios suelo', 'precio del suelo', 'precios del suelo',
+            'valor suelo', 'coste suelo', 'terreno', 'solar', 'suelo urbanizable'
+        ],
+        
+        # Construcción
+        NewsCategory.NOTICIAS_CONSTRUCCION: [
+            'construcción', 'construcciones', 'obra', 'obras', 'edificación',
+            'promoción inmobiliaria', 'promociones inmobiliarias', 'desarrollo inmobiliario',
+            'obra nueva', 'vivienda nueva', 'nueva construcción'
+        ],
+        NewsCategory.NOTICIAS_URBANIZACION: [
+            'urbanización', 'urbanizaciones', 'urbanismo', 'planeamiento',
+            'plan general', 'pgou', 'licencia urbanística', 'ordenación territorial'
+        ],
+        NewsCategory.NOVEDADES_CONSTRUCCION: [
+            'nueva construcción', 'nuevas construcciones', 'innovación construcción',
+            'tecnología construcción', 'tendencias construcción', 'novedad construcción'
+        ],
+        NewsCategory.CONSTRUCCION_MODULAR: [
+            'construcción modular', 'vivienda modular', 'prefabricada', 'prefabricadas',
+            'modular', 'industrializada', 'construcción industrializada'
+        ],
+        
+        # Alquiler y normativas
+        NewsCategory.ALQUILER_VACACIONAL: [
+            'alquiler vacacional', 'alquileres vacacionales', 'airbnb', 'booking',
+            'turismo residencial', 'vivienda turística', 'apartamento turístico'
+        ],
+        NewsCategory.NORMATIVAS_VIVIENDAS: [
+            'normativa', 'normativas', 'ley vivienda', 'ley de vivienda',
+            'regulación vivienda', 'decreto vivienda', 'real decreto',
+            'legislación inmobiliaria', 'marco legal', 'ley urbanística'
+        ],
+        
+        # Análisis y tendencias
+        NewsCategory.FUTURO_SECTOR_INMOBILIARIO: [
+            'futuro sector', 'tendencias inmobiliarias', 'perspectivas sector',
+            'evolución sector', 'previsión sector', 'proyección sector',
+            'sector inmobiliario futuro', 'tendencias mercado'
+        ],
+        NewsCategory.BURBUJA_INMOBILIARIA: [
+            'burbuja inmobiliaria', 'burbuja', 'sobrevaloración', 'sobreprecio',
+            'corrección mercado', 'ajuste precios', 'caída precios'
+        ],
+        
+        # General (debe ir al final como fallback)
+        NewsCategory.NOTICIAS_INMOBILIARIAS: [
+            'inmobiliario', 'inmobiliaria', 'inmobiliarias', 'vivienda', 'viviendas',
+            'propiedad', 'propiedades', 'inmueble', 'inmuebles', 'mercado inmobiliario'
+        ],
+    }
+    
+    # Buscar coincidencias (de más específico a menos específico)
+    # Ordenar por longitud de lista de keywords (más específico = menos keywords)
+    sorted_categories = sorted(
+        keyword_mapping.items(),
+        key=lambda x: len(x[1]),
+        reverse=False  # Más específico primero
+    )
+    
+    for category, keywords in sorted_categories:
+        for keyword in keywords:
+            if keyword in text_to_analyze:
+                return category
+    
+    # Si no se encuentra ninguna coincidencia, retornar None
+    return None
+
+
 def _parse_published_date(entry) -> datetime:
     """
     Intenta parsear la fecha de publicación de una entrada RSS.
@@ -306,7 +485,7 @@ def _parse_published_date(entry) -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 5) -> Dict[str, int]:
+async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 10) -> Dict[str, int]:
     """
     Ingesta noticias desde todas las fuentes RSS configuradas.
     
@@ -353,11 +532,18 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                 results[source_name] = 0
                 continue
             
-            # Limitar el número de entradas a procesar (para evitar demasiadas noticias)
-            entries_to_process = feed.entries[:max_items_per_source]
+            # Procesar TODAS las entradas del feed, pero filtrar por relevancia inmobiliaria
+            # Esto asegura que no perdamos noticias importantes que estén más abajo en el feed
+            entries_to_process = feed.entries  # Procesar todas las entradas
+            
+            # Contador para limitar cuántas noticias relevantes insertamos por fuente
+            relevant_count = 0
             
             # Procesar cada entrada del feed
             for entry in entries_to_process:
+                # Si ya hemos insertado el máximo de noticias relevantes, parar
+                if relevant_count >= max_items_per_source:
+                    break
                 # Extraer datos básicos
                 title = getattr(entry, 'title', 'Sin título')
                 link = getattr(entry, 'link', '')
@@ -373,9 +559,12 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                 elif hasattr(entry, 'description') and entry.description:
                     temp_summary = entry.description
                 
-                # Filtrar noticias: solo España y Europa
-                if not _is_relevant_to_spain_europe(title, temp_summary):
-                    continue  # Saltar esta noticia
+                # Filtrar noticias: solo las relevantes al sector inmobiliario
+                if not _is_relevant_to_real_estate(title, temp_summary):
+                    continue  # Saltar esta noticia (no es inmobiliaria)
+                
+                # Incrementar contador de noticias relevantes encontradas
+                relevant_count += 1
                 
                 # Parsear fecha
                 published_at = _parse_published_date(entry)
@@ -420,6 +609,11 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                 if not raw_summary and temp_summary:
                     raw_summary = _clean_html(temp_summary)
                 
+                # Categorizar automáticamente basándose en palabras clave
+                detected_category = _categorize_by_keywords(title, raw_summary)
+                # Usar categoría detectada si existe, sino usar la categoría por defecto de la fuente
+                final_category = detected_category if detected_category else default_category
+                
                 # Verificar si ya existe una noticia con la misma URL
                 stmt = select(News).where(News.url == link)
                 result = await session.execute(stmt)
@@ -432,7 +626,7 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                         source=source_label,
                         url=link,
                         published_at=published_at,
-                        category=default_category,
+                        category=final_category,
                         raw_summary=raw_summary,
                         althara_summary=None,
                         tags=None,
