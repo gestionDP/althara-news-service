@@ -39,6 +39,13 @@ RSS_SOURCES = [
         "source": "El Economista",
         "description": "Noticias sobre vivienda y mercado inmobiliario"
     },
+    {
+        "name": "Idealista News",
+        "url": "https://www.idealista.com/en/news/rss/v2/latest-news.xml",
+        "default_category": NewsCategory.NOTICIAS_INMOBILIARIAS,
+        "source": "Idealista",
+        "description": "Noticias inmobiliarias generales: mercado, precios, hipotecas, normativa"
+    },
     
     # BOE - Subastas y normativas
     {
@@ -127,19 +134,26 @@ def _is_relevant_to_spain_europe(title: str, summary: str = None) -> bool:
     if summary:
         text_to_check += " " + summary.lower()
     
-    # Palabras clave que indican España/Europa
+    # Palabras clave que indican España/Europa (español e inglés)
     spain_keywords = [
         "españa", "español", "española", "españoles",
         "madrid", "barcelona", "valencia", "sevilla", "bilbao",
         "andalucía", "cataluña", "madrileño", "catalán",
-        "boe", "gobierno español", "ministerio"
+        "boe", "gobierno español", "ministerio",
+        # Inglés
+        "spain", "spanish", "madrid", "barcelona", "valencia", "seville", "bilbao",
+        "andalusia", "catalonia", "catalan"
     ]
     
     europe_keywords = [
         "europa", "europeo", "europea", "europeos",
         "ue", "unión europea", "bruselas",
         "alemania", "francia", "italia", "portugal",
-        "países bajos", "bélgica"
+        "países bajos", "bélgica",
+        # Inglés
+        "europe", "european", "eu", "european union", "brussels",
+        "germany", "france", "italy", "portugal",
+        "netherlands", "belgium"
     ]
     
     # Excluir palabras que indican otros países/regiones

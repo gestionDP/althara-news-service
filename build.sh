@@ -18,3 +18,4 @@ pip install --only-binary :all: -r requirements.txt 2>/dev/null || pip install -
 echo "✅ Build completado!"
 
 
+

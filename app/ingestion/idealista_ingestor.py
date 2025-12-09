@@ -54,3 +54,4 @@ async def ingest_idealista_news(session: AsyncSession) -> int:
     return inserted_count
 
 
+
