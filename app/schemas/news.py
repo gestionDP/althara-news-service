@@ -13,6 +13,8 @@ class NewsBase(BaseModel):
     althara_summary: Optional[str] = None
     tags: Optional[str] = None
     used_in_social: bool = False
+    provincia: Optional[str] = None
+    poblacion: Optional[str] = None
 
 class NewsCreate(NewsBase):
     """Schema para crear una noticia. No incluye id, created_at, updated_at"""

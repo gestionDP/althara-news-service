@@ -1,13 +1,17 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, func
+from sqlalchemy.exc import SQLAlchemyError
 from typing import Optional
 from datetime import datetime
 from uuid import UUID
+import logging
 
 from app.database import get_db
 from app.models.news import News
 from app.schemas.news import NewsCreate, NewsRead, PaginatedResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -41,57 +45,70 @@ async def list_news(
     Por defecto devuelve las últimas 50 noticias (las más recientes primero).
     Usa `limit` y `offset` para paginación.
     """
-    # Query base
-    query = select(News)
-    count_query = select(func.count()).select_from(News)
-    
-    conditions = []
-    
-    if category:
-        conditions.append(News.category == category)
-    
-    if from_date:
-        conditions.append(News.published_at >= from_date)
-    
-    if to_date:
-        conditions.append(News.published_at <= to_date)
-    
-    if q:
-        conditions.append(News.title.ilike(f"%{q}%"))
-    
-    # Filtro por used_in_social si se especifica
-    if used_in_social is not None:
-        conditions.append(News.used_in_social == used_in_social)
-    
-    # Aplicar condiciones a ambas queries
-    if conditions:
-        query = query.where(and_(*conditions))
-        count_query = count_query.where(and_(*conditions))
-    
-    # Ordenar por fecha (más recientes primero)
-    query = query.order_by(News.published_at.desc())
-    
-    # Aplicar paginación
-    query = query.limit(limit).offset(offset)
-    
-    # Ejecutar queries
-    result = await db.execute(query)
-    news_list = result.scalars().all()
-    
-    # Obtener total
-    total_result = await db.execute(count_query)
-    total = total_result.scalar_one()
-    
-    # Calcular si hay más resultados
-    has_more = (offset + limit) < total
-    
-    return PaginatedResponse[NewsRead](
-        items=news_list,
-        total=total,
-        limit=limit,
-        offset=offset,
-        has_more=has_more
-    )
+    try:
+        # Query base
+        query = select(News)
+        count_query = select(func.count()).select_from(News)
+        
+        conditions = []
+        
+        if category:
+            conditions.append(News.category == category)
+        
+        if from_date:
+            conditions.append(News.published_at >= from_date)
+        
+        if to_date:
+            conditions.append(News.published_at <= to_date)
+        
+        if q:
+            conditions.append(News.title.ilike(f"%{q}%"))
+        
+        # Filtro por used_in_social si se especifica
+        if used_in_social is not None:
+            conditions.append(News.used_in_social == used_in_social)
+        
+        # Aplicar condiciones a ambas queries
+        if conditions:
+            query = query.where(and_(*conditions))
+            count_query = count_query.where(and_(*conditions))
+        
+        # Ordenar por fecha (más recientes primero)
+        query = query.order_by(News.published_at.desc())
+        
+        # Aplicar paginación
+        query = query.limit(limit).offset(offset)
+        
+        # Ejecutar queries
+        result = await db.execute(query)
+        news_list = result.scalars().all()
+        
+        # Obtener total
+        total_result = await db.execute(count_query)
+        total = total_result.scalar_one()
+        
+        # Calcular si hay más resultados
+        has_more = (offset + limit) < total
+        
+        return PaginatedResponse[NewsRead](
+            items=news_list,
+            total=total,
+            limit=limit,
+            offset=offset,
+            has_more=has_more
+        )
+    except SQLAlchemyError as e:
+        logger.error(f"Error de base de datos al listar noticias: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Error al acceder a la base de datos. Por favor, inténtalo de nuevo más tarde."
+        )
+    except Exception as e:
+        logger.error(f"Error inesperado al listar noticias: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail="Error interno del servidor. Por favor, inténtalo de nuevo más tarde."
+        )
 
 @router.get("/news/{id}", response_model=NewsRead)
 async def get_news(id: UUID, db: AsyncSession = Depends(get_db)):
