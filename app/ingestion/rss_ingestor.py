@@ -178,6 +178,23 @@ def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
     
     # Palabras clave que indican que NO es una noticia inmobiliaria
     exclude_keywords = [
+        # Premios y galardones de arquitectura/construcción (no relevantes al mercado)
+        'premio', 'premios', 'galardón', 'galardones', 'award', 'awards',
+        'gana premio', 'ganan premio', 'premio de', 'premios de',
+        'architecture awards', 'premios cerámica', 'premios internacionales',
+        'excelencia', 'galardones en arquitectura',
+        # Ferias y eventos de construcción (no relevantes al mercado)
+        'feria', 'ferias', 'exposición', 'exposiciones', 'congreso',
+        'big 5 global', 'participa en', 'participa exitosamente',
+        'convocan', 'se convocan', 'convocatoria',
+        # Productos específicos de construcción (no relevantes al mercado)
+        'calzado', 'zapatos', 'panter', 'marca made in spain',
+        'teja cerámica', 'cubiertas microventiladas', 'materiales nobles',
+        'fachada viva', 'impresión 3d', 'impresa en 3d',
+        # Noticias técnicas de construcción (no relevantes al mercado)
+        'diseñar con sombra', 'arquitectura bioclimática', 'arquitectura sostenible',
+        'transformación digital', 'building smart', 'tecniberia',
+        'formación avanzada', 'gestión comercial', 'distribución profesional',
         # Accidentes y sucesos
         'herido', 'heridos', 'accidente', 'accidentes', 'volcar', 'volcó',
         'atropello', 'atropellado', 'choque', 'colisión',
@@ -188,7 +205,7 @@ def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
         'película', 'películas', 'cine', 'actor', 'actriz',
         'música', 'concierto', 'conciertos', 'festival',
         'libro', 'libros', 'escritor', 'escritora',
-        'exposición', 'exposiciones', 'museo', 'museos',
+        'museo', 'museos',
         # Deportes
         'fútbol', 'futbol', 'partido', 'partidos', 'gol', 'goles',
         'equipo', 'equipos', 'jugador', 'jugadores',
@@ -491,6 +508,9 @@ def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Option
         for keyword in keywords:
             if keyword in text_to_analyze:
                 return category
+    
+    # Si no se encontró ninguna categoría, devolver la categoría general como fallback
+    return NewsCategory.NOTICIAS_INMOBILIARIAS
     
     # Si no se encuentra ninguna coincidencia, retornar None
     return None
