@@ -41,7 +41,7 @@ RSS_SOURCES = [
     },
     {
         "name": "Idealista News",
-        "url": "https://www.idealista.com/en/news/rss/v2/latest-news.xml",
+        "url": "https://www.idealista.com/news/rss/v2/latest-news.xml",
         "default_category": NewsCategory.NOTICIAS_INMOBILIARIAS,
         "source": "Idealista",
         "description": "Noticias inmobiliarias generales: mercado, precios, hipotecas, normativa"
@@ -330,21 +330,35 @@ def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Option
     
     # Mapeo de palabras clave a categorías (ordenado por especificidad)
     keyword_mapping = {
-        # Fondos e inversión
+        # Fondos e inversión (prioridad alta - buscar primero)
         NewsCategory.FONDOS_INVERSION_INMOBILIARIA: [
+            # Frases específicas primero (más prioritarias - buscar primero)
+            'experto en vivienda', 'experto inmobiliario', 'ceo de', 'director general de',
             'fondo de inversión', 'fondos de inversión', 'fondo inmobiliario', 'fondos inmobiliarios',
+            'gestión de activos inmobiliarios', 'vehículo de inversión',
+            'gestión patrimonial', 'patrimonio inmobiliario', 'grupo inmobiliario',
+            'estrategia inversión', 'estrategia inmobiliaria', 'ciclo inmobiliario',
+            'gestiona millones', 'millones en patrimonio', 'patrimonio de millones',
+            # Nombres de empresas (muy específicos)
+            'mazabi', 'merlin', 'colonial', 'metrovacesa', 'neinor', 'azora', 'hines',
+            'silicius',
+            # Términos técnicos
             'socimi', 'socimis', 'reit', 'reits', 'fondo cerrado', 'fondo abierto',
-            'gestión de activos inmobiliarios', 'vehículo de inversión'
+            # Palabras sueltas (menos prioritarias)
+            'experto', 'expertos', 'ceo', 'director general', 'directivo', 'directivos',
+            'patrimonio de'
         ],
         NewsCategory.GRANDES_INVERSIONES_INMOBILIARIAS: [
             'gran inversión', 'grandes inversiones', 'inversión millonaria', 'millones de inversión',
             'mega proyecto', 'macro proyecto', 'inversión masiva', 'operación inmobiliaria',
-            'transacción millonaria', 'adquisición millonaria'
+            'transacción millonaria', 'adquisición millonaria',
+            'proyectos en españa', 'proyectos en londres', 'proyectos en parís'
         ],
         NewsCategory.MOVIMIENTOS_GRANDES_TENEDORES: [
             'gran tenedor', 'grandes tenedores', 'inversor institucional', 'inversores institucionales',
             'fondo buitre', 'fondos buitre', 'hedge fund', 'private equity',
-            'operador inmobiliario', 'operadores inmobiliarios'
+            'operador inmobiliario', 'operadores inmobiliarios',
+            'rotación de activos', 'desinversión', 'desinvirtiendo', 'reinversión'
         ],
         NewsCategory.TOKENIZATION_ACTIVOS: [
             'tokenización', 'tokenizacion', 'token', 'blockchain inmobiliario',
@@ -440,14 +454,40 @@ def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Option
     }
     
     # Buscar coincidencias (de más específico a menos específico)
-    # Ordenar por longitud de lista de keywords (más específico = menos keywords)
-    sorted_categories = sorted(
-        keyword_mapping.items(),
-        key=lambda x: len(x[1]),
-        reverse=False  # Más específico primero
-    )
+    # Estrategia: buscar primero frases completas, luego palabras sueltas
+    # Priorizar categorías más específicas (FONDOS antes que GRANDES_INVERSIONES)
     
-    for category, keywords in sorted_categories:
+    # Separar categorías específicas de la general
+    specific_categories = {k: v for k, v in keyword_mapping.items() 
+                          if k != NewsCategory.NOTICIAS_INMOBILIARIAS}
+    general_category = {NewsCategory.NOTICIAS_INMOBILIARIAS: keyword_mapping[NewsCategory.NOTICIAS_INMOBILIARIAS]}
+    
+    # Ordenar categorías específicas: primero por número de keywords (menos = más específico),
+    # pero dar prioridad explícita a FONDOS_INVERSION_INMOBILIARIA
+    def sort_key(item):
+        category, keywords = item
+        # FONDOS_INVERSION_INMOBILIARIA tiene máxima prioridad
+        if category == NewsCategory.FONDOS_INVERSION_INMOBILIARIA:
+            return (0, len(keywords))  # Prioridad 0, luego por número de keywords
+        else:
+            return (1, len(keywords))  # Otras categorías con prioridad 1
+    
+    sorted_specific = sorted(specific_categories.items(), key=sort_key)
+    
+    # Primera pasada: buscar frases completas en categorías específicas (más específicas primero)
+    for category, keywords in sorted_specific:
+        for keyword in keywords:
+            if ' ' in keyword and keyword in text_to_analyze:
+                return category
+    
+    # Segunda pasada: buscar palabras sueltas en categorías específicas
+    for category, keywords in sorted_specific:
+        for keyword in keywords:
+            if ' ' not in keyword and keyword in text_to_analyze:
+                return category
+    
+    # Última pasada: buscar en categoría general (fallback)
+    for category, keywords in general_category.items():
         for keyword in keywords:
             if keyword in text_to_analyze:
                 return category

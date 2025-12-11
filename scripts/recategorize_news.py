@@ -82,3 +82,4 @@ async def recategorize_existing_news():
 if __name__ == "__main__":
     result = asyncio.run(recategorize_existing_news())
     sys.exit(0 if result.get("success") else 1)
+
