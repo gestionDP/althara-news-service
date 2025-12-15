@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Script para ejecutar la ingestión de noticias desde la línea de comandos.
+Script to run news ingestion from command line.
 
-Útil para cron jobs o ejecución programada.
+Useful for cron jobs or scheduled execution.
 """
 import asyncio
 import sys
 from pathlib import Path
 
-# Añadir el directorio raíz al path para importar app
 root_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(root_dir))
 
@@ -21,22 +20,20 @@ from sqlalchemy import select
 
 
 async def ingest_and_adapt():
-    """Ejecuta ingestión y adaptación en una sola función"""
+    """Executes ingestion and adaptation in a single function"""
     async with AsyncSessionLocal() as session:
         try:
-            # 1. Ingestar noticias
-            print("📥 Ingestando noticias desde RSS...")
+            print("📥 Ingesting news from RSS...")
             results = await ingest_rss_sources(session)
             
             total_inserted = sum(results.values())
-            print(f"✅ Se insertaron {total_inserted} noticias nuevas")
+            print(f"✅ Inserted {total_inserted} new news items")
             
             for source, count in results.items():
                 if count > 0:
-                    print(f"   - {source}: {count} noticias")
+                    print(f"   - {source}: {count} news items")
             
-            # 2. Adaptar noticias pendientes
-            print("\n🎨 Adaptando noticias al tono Althara...")
+            print("\n🎨 Adapting news to Althara tone...")
             stmt = select(News).where(News.althara_summary.is_(None))
             result = await session.execute(stmt)
             pending_news = result.scalars().all()
@@ -52,13 +49,13 @@ async def ingest_and_adapt():
                     news.althara_summary = althara_summary
                     adapted_count += 1
                 except Exception as e:
-                    print(f"   ⚠️  Error adaptando noticia {news.id}: {e}")
+                    print(f"   ⚠️  Error adapting news {news.id}: {e}")
                     continue
             
             if adapted_count > 0:
                 await session.commit()
             
-            print(f"✅ Se adaptaron {adapted_count} noticias al tono Althara")
+            print(f"✅ Adapted {adapted_count} news items to Althara tone")
             
             return {
                 "ingested": total_inserted,
@@ -78,6 +75,7 @@ async def ingest_and_adapt():
 if __name__ == "__main__":
     result = asyncio.run(ingest_and_adapt())
     sys.exit(0 if result.get("success") else 1)
+
 
 
 

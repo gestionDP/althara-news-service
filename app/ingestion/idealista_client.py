@@ -1,15 +1,15 @@
 """
-Cliente para la API de Idealista.
+Client for Idealista API.
 
-IMPORTANTE: Idealista NO tiene una API pública de noticias.
-Su API oficial solo incluye búsqueda de propiedades y datos de mercado.
+IMPORTANT: Idealista does NOT have a public news API.
+Their official API only includes property search and market data.
 
-Este módulo mantiene un mock de noticias para:
-- Testing y desarrollo
-- Estructura lista si en el futuro Idealista ofrece API de noticias
-- O para otros usos (datos de mercado, etc.)
+This module maintains a news mock for:
+- Testing and development
+- Ready structure if Idealista offers a news API in the future
+- Or for other uses (market data, etc.)
 
-Para noticias reales, usar fuentes RSS (ver rss_ingestor.py).
+For real news, use RSS sources (see rss_ingestor.py).
 """
 from pydantic import BaseModel
 from datetime import datetime, timezone
@@ -19,7 +19,7 @@ from app.constants import NewsCategory
 
 
 class IdealistaNewsItem(BaseModel):
-    """Modelo para un item de noticia de Idealista"""
+    """Model for an Idealista news item"""
     title: str
     source: str = "Idealista"
     url: str
@@ -30,28 +30,27 @@ class IdealistaNewsItem(BaseModel):
 
 
 class IdealistaClient:
-    """Cliente para interactuar con la API de Idealista"""
+    """Client for interacting with Idealista API"""
     
     def __init__(self):
-        """Inicializa el cliente con la configuración"""
+        """Initializes the client with configuration"""
         self.base_url = settings.IDEALISTA_API_BASE_URL
         self.api_key = settings.IDEALISTA_API_KEY
         self.api_secret = settings.IDEALISTA_API_SECRET
     
     async def fetch_news(self, limit: int = 20) -> list[IdealistaNewsItem]:
         """
-        Obtiene noticias de Idealista.
+        Gets news from Idealista.
         
-        Por ahora es un MOCK que genera noticias de prueba.
-        TODO: Implementar llamada real a la API de Idealista.
+        Currently a MOCK that generates test news.
+        TODO: Implement real call to Idealista API.
         
         Args:
-            limit: Número máximo de noticias a obtener
+            limit: Maximum number of news items to get
             
         Returns:
-            Lista de items de noticias
+            List of news items
         """
-        # MOCK: Generar noticias de prueba
         mock_news = [
             IdealistaNewsItem(
                 title="El precio de la vivienda en Madrid sube un 5% en el último trimestre",
@@ -100,16 +99,15 @@ class IdealistaClient:
             ),
         ]
         
-        # Limitar al número solicitado
         return mock_news[:limit]
     
-    # TODO: Implementar método para autenticación con OAuth2 de Idealista
+    # TODO: Implement method for OAuth2 authentication with Idealista
     # async def _get_access_token(self) -> str:
-    #     """Obtiene un token de acceso para la API de Idealista"""
+    #     """Gets an access token for Idealista API"""
     #     pass
     
-    # TODO: Implementar método para llamar a endpoints reales de Idealista
+    # TODO: Implement method to call real Idealista endpoints
     # async def _call_api(self, endpoint: str, params: dict) -> dict:
-    #     """Realiza una llamada a la API de Idealista"""
+    #     """Makes a call to Idealista API"""
     #     pass
 

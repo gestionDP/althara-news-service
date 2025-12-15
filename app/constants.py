@@ -1,20 +1,17 @@
 """
-Constantes del microservicio Althara News Service
+Constants for Althara News Service microservice.
 
-Este archivo contiene las categorías de noticias definidas para el sistema.
+This file contains the news categories defined for the system.
 """
 
-# Categorías de noticias inmobiliarias
 class NewsCategory:
-    """Categorías de noticias definidas para el sistema"""
+    """News categories defined for the system"""
     
-    # Fondos e inversión
     FONDOS_INVERSION_INMOBILIARIA = "FONDOS_INVERSION_INMOBILIARIA"
     GRANDES_INVERSIONES_INMOBILIARIAS = "GRANDES_INVERSIONES_INMOBILIARIAS"
     MOVIMIENTOS_GRANDES_TENEDORES = "MOVIMIENTOS_GRANDES_TENEDORES"
     TOKENIZATION_ACTIVOS = "TOKENIZATION_ACTIVOS"
     
-    # Noticias generales
     NOTICIAS_INMOBILIARIAS = "NOTICIAS_INMOBILIARIAS"
     NOTICIAS_HIPOTECAS = "NOTICIAS_HIPOTECAS"
     NOTICIAS_LEYES_OKUPAS = "NOTICIAS_LEYES_OKUPAS"
@@ -22,27 +19,22 @@ class NewsCategory:
     NOTICIAS_DESAHUCIOS = "NOTICIAS_DESAHUCIOS"
     NOTICIAS_CONSTRUCCION = "NOTICIAS_CONSTRUCCION"
     
-    # Precios y mercado
     PRECIOS_VIVIENDA = "PRECIOS_VIVIENDA"
     PRECIOS_MATERIALES = "PRECIOS_MATERIALES"
     PRECIOS_SUELO = "PRECIOS_SUELO"
     
-    # Análisis y tendencias
     FUTURO_SECTOR_INMOBILIARIO = "FUTURO_SECTOR_INMOBILIARIO"
     BURBUJA_INMOBILIARIA = "BURBUJA_INMOBILIARIA"
     
-    # Alquiler y normativas
     ALQUILER_VACACIONAL = "ALQUILER_VACACIONAL"
     NORMATIVAS_VIVIENDAS = "NORMATIVAS_VIVIENDAS"
     FALTA_VIVIENDA = "FALTA_VIVIENDA"
     
-    # Construcción y urbanización
     NOTICIAS_URBANIZACION = "NOTICIAS_URBANIZACION"
     NOVEDADES_CONSTRUCCION = "NOVEDADES_CONSTRUCCION"
     CONSTRUCCION_MODULAR = "CONSTRUCCION_MODULAR"
 
 
-# Lista de todas las categorías válidas (útil para validación)
 VALID_CATEGORIES = [
     NewsCategory.FONDOS_INVERSION_INMOBILIARIA,
     NewsCategory.GRANDES_INVERSIONES_INMOBILIARIAS,
@@ -67,7 +59,6 @@ VALID_CATEGORIES = [
     NewsCategory.CONSTRUCCION_MODULAR,
 ]
 
-# Mapeo legible para humanos (para documentación y UI)
 CATEGORY_LABELS = {
     NewsCategory.FONDOS_INVERSION_INMOBILIARIA: "Fondos de inversión inmobiliaria",
     NewsCategory.GRANDES_INVERSIONES_INMOBILIARIAS: "Noticias grandes inversiones inmobiliarias",
@@ -91,6 +82,7 @@ CATEGORY_LABELS = {
     NewsCategory.NOVEDADES_CONSTRUCCION: "Novedades de construcción",
     NewsCategory.CONSTRUCCION_MODULAR: "Construcción modular",
 }
+
 
 
 

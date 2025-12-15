@@ -1,8 +1,8 @@
 """
-Ingestor de noticias desde Idealista API.
+News ingestor from Idealista API.
 
-Toma los items de IdealistaClient y los inserta en la base de datos,
-evitando duplicados.
+Takes items from IdealistaClient and inserts them into the database,
+avoiding duplicates.
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -12,13 +12,13 @@ from app.models.news import News
 
 async def ingest_idealista_news(session: AsyncSession) -> int:
     """
-    Ingesta noticias desde Idealista.
+    Ingests news from Idealista.
     
     Args:
-        session: Sesión de base de datos async
+        session: Async database session
         
     Returns:
-        Número de noticias insertadas
+        Number of news items inserted
     """
     client = IdealistaClient()
     items = await client.fetch_news(limit=20)
@@ -26,13 +26,11 @@ async def ingest_idealista_news(session: AsyncSession) -> int:
     inserted_count = 0
     
     for item in items:
-        # Verificar si ya existe una noticia con la misma URL
         stmt = select(News).where(News.url == item.url)
         result = await session.execute(stmt)
         existing_news = result.scalar_one_or_none()
         
         if existing_news is None:
-            # Crear nuevo registro News
             new_news = News(
                 title=item.title,
                 source=item.source,
@@ -47,11 +45,11 @@ async def ingest_idealista_news(session: AsyncSession) -> int:
             session.add(new_news)
             inserted_count += 1
     
-    # Commit una sola vez al final
     if inserted_count > 0:
         await session.commit()
     
     return inserted_count
+
 
 
 

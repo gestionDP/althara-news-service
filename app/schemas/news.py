@@ -17,11 +17,11 @@ class NewsBase(BaseModel):
     poblacion: Optional[str] = None
 
 class NewsCreate(NewsBase):
-    """Schema para crear una noticia. No incluye id, created_at, updated_at"""
+    """Schema for creating a news item. Excludes id, created_at, updated_at"""
     pass
 
 class NewsRead(NewsBase):
-    """Schema para leer una noticia. Incluye todos los campos"""
+    """Schema for reading a news item. Includes all fields"""
     id: UUID
     created_at: datetime
     updated_at: datetime
@@ -30,11 +30,10 @@ class NewsRead(NewsBase):
         from_attributes = True
 
 
-# Schema para respuesta paginada
 T = TypeVar('T')
 
 class PaginatedResponse(BaseModel, Generic[T]):
-    """Schema para respuestas paginadas"""
+    """Schema for paginated responses"""
     items: List[T]
     total: int
     limit: int

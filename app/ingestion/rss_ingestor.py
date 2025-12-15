@@ -1,8 +1,8 @@
 """
-Ingestor genérico de noticias desde fuentes RSS.
+Generic news ingestor from RSS sources.
 
-Parsea feeds RSS legales y los inserta en la base de datos.
-NOTA: Idealista NO tiene API de noticias, por eso usamos fuentes RSS.
+Parses legal RSS feeds and inserts them into the database.
+NOTE: Idealista does NOT have a news API, so we use RSS sources.
 """
 import re
 import html
@@ -47,7 +47,6 @@ RSS_SOURCES = [
         "description": "Noticias inmobiliarias generales: mercado, precios, hipotecas, normativa"
     },
     
-    # BOE - Subastas y normativas
     {
         "name": "BOE Subastas",
         "url": "https://subastas.boe.es/rss.php",
@@ -63,7 +62,6 @@ RSS_SOURCES = [
         "description": "Leyes y normativas (puede incluir temas de vivienda)"
     },
     
-    # Observatorios y análisis
     {
         "name": "Observatorio Inmobiliario",
         "url": "https://www.observatorioinmobiliario.es/rss/",
@@ -72,7 +70,6 @@ RSS_SOURCES = [
         "description": "Análisis y noticias del sector inmobiliario"
     },
     
-    # Construcción y urbanismo
     {
         "name": "Interempresas Construcción",
         "url": "https://www.interempresas.net/construccion/RSS/",
@@ -81,7 +78,6 @@ RSS_SOURCES = [
         "description": "Noticias sobre construcción"
     },
     
-    # Medios locales - Baleares
     {
         "name": "Última Hora",
         "url": "https://www.ultimahora.es/feed.rss",
@@ -89,36 +85,25 @@ RSS_SOURCES = [
         "source": "Última Hora",
         "description": "Noticias locales de Baleares: alquiler, vivienda, mercado inmobiliario"
     },
-    # ArchDaily eliminado: es internacional y no garantiza solo España/Europa
-    # Si necesitas noticias de arquitectura específicas de España, considerar:
-    # - Plataforma Arquitectura (si tiene feed específico de España)
-    # - O agregar filtrado por ubicación en el futuro
 ]
 
 
 def _clean_html(text: str) -> str:
     """
-    Limpia HTML de un texto, extrayendo solo el contenido de texto puro.
+    Cleans HTML from text, extracting only pure text content.
     
     Args:
-        text: Texto que puede contener HTML
+        text: Text that may contain HTML
         
     Returns:
-        Texto limpio sin tags HTML ni entidades HTML
+        Clean text without HTML tags or entities
     """
     if not text:
         return ""
     
-    # Convertir entidades HTML a caracteres normales (&amp; -> &, etc.)
     text = html.unescape(text)
-    
-    # Remover tags HTML (ej: <p>, <a href="...">, etc.)
     text = re.sub(r'<[^>]+>', '', text)
-    
-    # Limpiar espacios múltiples y saltos de línea
     text = re.sub(r'\s+', ' ', text)
-    
-    # Limpiar espacios al inicio y final
     text = text.strip()
     
     return text
@@ -126,26 +111,23 @@ def _clean_html(text: str) -> str:
 
 def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
     """
-    Filtra noticias para mantener solo las relevantes al sector inmobiliario.
+    Filters news to keep only those relevant to the real estate sector.
     
     Args:
-        title: Título de la noticia
-        summary: Resumen de la noticia (opcional)
+        title: News title
+        summary: News summary (optional)
         
     Returns:
-        True si la noticia es relevante al sector inmobiliario, False en caso contrario
+        True if the news is relevant to the real estate sector, False otherwise
     """
     if not title:
         return False
     
-    # Combinar título y resumen para búsqueda
     text_to_check = title.lower()
     if summary:
         text_to_check += " " + summary.lower()
     
-    # Palabras clave que indican que es una noticia inmobiliaria
     real_estate_keywords = [
-        # Términos principales
         'vivienda', 'viviendas', 'inmobiliario', 'inmobiliaria', 'inmobiliarias',
         'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria',
         'alquiler', 'alquileres', 'renta', 'rentas',
@@ -169,93 +151,80 @@ def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
         'licencia', 'licencias', 'permiso construcción',
         'arquitectura', 'arquitecto', 'arquitecta',
         'reforma', 'reformas', 'rehabilitación',
-        # Inglés
         'property', 'properties', 'real estate', 'housing',
         'mortgage', 'mortgages', 'rent', 'rental',
         'construction', 'building', 'development',
         'investment', 'investor', 'investors'
     ]
     
-    # Palabras clave que indican que NO es una noticia inmobiliaria
     exclude_keywords = [
-        # Premios y galardones de arquitectura/construcción (no relevantes al mercado)
+        'países más visitados', 'países visitados', 'turismo', 'viajeros', 'destinos turísticos',
+        'visitantes', 'turistas', 'atracciones turísticas',
+        'arquitecto', 'arquitectos', 'arquitectura', 'arquitectónico',
+        'obras más destacadas', 'recorrido por', 'estudio de arquitectura',
+        'doctor arquitecto', 'máster en arquitectura',
+        'logístico', 'logística', 'macrocentro logístico', 'centro logístico',
+        'almacén', 'almacenes', 'distribución logística',
         'premio', 'premios', 'galardón', 'galardones', 'award', 'awards',
         'gana premio', 'ganan premio', 'premio de', 'premios de',
         'architecture awards', 'premios cerámica', 'premios internacionales',
         'excelencia', 'galardones en arquitectura',
-        # Ferias y eventos de construcción (no relevantes al mercado)
         'feria', 'ferias', 'exposición', 'exposiciones', 'congreso',
         'big 5 global', 'participa en', 'participa exitosamente',
         'convocan', 'se convocan', 'convocatoria',
-        # Productos específicos de construcción (no relevantes al mercado)
         'calzado', 'zapatos', 'panter', 'marca made in spain',
         'teja cerámica', 'cubiertas microventiladas', 'materiales nobles',
         'fachada viva', 'impresión 3d', 'impresa en 3d',
-        # Noticias técnicas de construcción (no relevantes al mercado)
         'diseñar con sombra', 'arquitectura bioclimática', 'arquitectura sostenible',
         'transformación digital', 'building smart', 'tecniberia',
         'formación avanzada', 'gestión comercial', 'distribución profesional',
-        # Accidentes y sucesos
         'herido', 'heridos', 'accidente', 'accidentes', 'volcar', 'volcó',
         'atropello', 'atropellado', 'choque', 'colisión',
         'muerto', 'muertos', 'fallecido', 'fallecidos',
         'detenido', 'detenidos', 'arresto', 'arrestos',
         'robo', 'robos', 'hurto', 'hurtos',
-        # Cultura y ocio no relacionado
         'película', 'películas', 'cine', 'actor', 'actriz',
         'música', 'concierto', 'conciertos', 'festival',
         'libro', 'libros', 'escritor', 'escritora',
         'museo', 'museos',
-        # Deportes
         'fútbol', 'futbol', 'partido', 'partidos', 'gol', 'goles',
         'equipo', 'equipos', 'jugador', 'jugadores',
-        # Política general (sin relación inmobiliaria)
         'elecciones', 'votación', 'votaciones', 'partido político',
-        # Sucesos generales
         'incendio', 'incendios', 'inundación', 'inundaciones',
         'temporal', 'temporales', 'lluvia', 'lluvias',
-        # Salud general
         'hospital', 'hospitales', 'médico', 'médicos', 'enfermedad',
-        # Educación general
         'colegio', 'colegios', 'universidad', 'universidades', 'estudiante',
-        # Tráfico y transporte (sin relación inmobiliaria)
         'tráfico', 'trafico', 'carretera', 'carreteras', 'autopista',
         'camión', 'camiones', 'coche', 'coches', 'vehículo', 'vehículos',
         'mercedes', 'bmw', 'audi', 'ford', 'renault', 'seat', 'volvo',
         'cabrio', 'todoterreno', 'automóvil', 'automóviles', 'auto',
-        # Noticias de sucesos locales sin relación
         'pintadas', 'grafiti', 'vandalismo',
         'homenaje', 'homenajes', 'acto', 'actos culturales',
-        # Tecnología y gadgets no relacionados
         'smartphone', 'tablet', 'iphone', 'android', 'app', 'aplicación',
-        # Deportes y entretenimiento
         'fútbol', 'futbol', 'baloncesto', 'tenis', 'deporte', 'deportes',
         'partido', 'partidos', 'gol', 'goles', 'equipo', 'equipos'
     ]
     
-    # Si contiene palabras de exclusión claras, descartar inmediatamente
     for keyword in exclude_keywords:
         if keyword in text_to_check:
             return False
     
-    # Debe contener al menos una palabra clave inmobiliaria
     for keyword in real_estate_keywords:
         if keyword in text_to_check:
             return True
     
-    # Si no tiene palabras clave inmobiliarias, descartar
     return False
 
 
 async def _extract_article_content(url: str) -> Optional[str]:
     """
-    Extrae el contenido completo del artículo desde la URL usando scraping.
+    Extracts complete article content from URL using scraping.
     
     Args:
-        url: URL del artículo
+        url: Article URL
         
     Returns:
-        Texto del artículo completo o None si falla
+        Complete article text or None if it fails
     """
     try:
         async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
@@ -264,23 +233,16 @@ async def _extract_article_content(url: str) -> Optional[str]:
             })
             response.raise_for_status()
             
-            # Asegurar que el contenido está en UTF-8
-            # BeautifulSoup maneja la codificación automáticamente, pero lo forzamos
             if response.encoding:
                 response.encoding = 'utf-8'
             
-            # Parsear HTML con codificación explícita
             soup = BeautifulSoup(response.text, 'html.parser', from_encoding='utf-8')
             
-            # Eliminar scripts, estilos y elementos no deseados
             for element in soup(["script", "style", "nav", "header", "footer", "aside", "iframe", "noscript"]):
                 element.decompose()
             
-            # Buscar el contenido principal del artículo
-            # Intentar encontrar el artículo usando selectores comunes
             article = None
             
-            # Selectores comunes para el contenido principal
             article_selectors = [
                 'article',
                 '.article-body',
@@ -298,70 +260,57 @@ async def _extract_article_content(url: str) -> Optional[str]:
                 if article:
                     break
             
-            # Si no se encuentra article, buscar divs con clase común de contenido
             if not article:
                 for div in soup.find_all('div', class_=re.compile(r'(content|article|post|entry)', re.I)):
-                    if len(div.get_text()) > 300:  # Si tiene bastante texto, probablemente es el contenido
+                    if len(div.get_text()) > 300:
                         article = div
                         break
             
-            # Si aún no se encuentra, usar el body completo (menos ideal pero funcional)
             if not article:
                 article = soup.find('body') or soup
             
-            # Extraer texto limpio
             text = article.get_text(separator=' ', strip=True) if article else soup.get_text(separator=' ', strip=True)
             
-            # Limpiar espacios múltiples
             text = re.sub(r'\s+', ' ', text)
             text = text.strip()
             
-            # Limitar a 5000 caracteres máximo (para no saturar la BD)
             if len(text) > 5000:
                 text = text[:5000] + "..."
             
-            return text if text and len(text) > 50 else None  # Mínimo 50 caracteres para considerar válido
+            return text if text and len(text) > 50 else None
             
     except Exception:
-        # Si falla el scraping, devolver None (usaremos el resumen del RSS como fallback)
         return None
 
 
 def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Optional[str]:
     """
-    Categoriza una noticia basándose en palabras clave del título y resumen.
+    Categorizes news based on keywords from title and summary.
     
     Args:
-        title: Título de la noticia
-        summary: Resumen de la noticia (opcional)
+        title: News title
+        summary: News summary (optional)
         
     Returns:
-        Categoría detectada o None si no se encuentra ninguna coincidencia
+        Detected category or None if no match is found
     """
     from app.constants import NewsCategory
     
-    # Combinar título y resumen para análisis
     text_to_analyze = title.lower()
     if summary:
         text_to_analyze += " " + summary.lower()
     
-    # Mapeo de palabras clave a categorías (ordenado por especificidad)
     keyword_mapping = {
-        # Fondos e inversión (prioridad alta - buscar primero)
         NewsCategory.FONDOS_INVERSION_INMOBILIARIA: [
-            # Frases específicas primero (más prioritarias - buscar primero)
             'experto en vivienda', 'experto inmobiliario', 'ceo de', 'director general de',
             'fondo de inversión', 'fondos de inversión', 'fondo inmobiliario', 'fondos inmobiliarios',
             'gestión de activos inmobiliarios', 'vehículo de inversión',
             'gestión patrimonial', 'patrimonio inmobiliario', 'grupo inmobiliario',
             'estrategia inversión', 'estrategia inmobiliaria', 'ciclo inmobiliario',
             'gestiona millones', 'millones en patrimonio', 'patrimonio de millones',
-            # Nombres de empresas (muy específicos)
             'mazabi', 'merlin', 'colonial', 'metrovacesa', 'neinor', 'azora', 'hines',
             'silicius',
-            # Términos técnicos
             'socimi', 'socimis', 'reit', 'reits', 'fondo cerrado', 'fondo abierto',
-            # Palabras sueltas (menos prioritarias)
             'experto', 'expertos', 'ceo', 'director general', 'directivo', 'directivos',
             'patrimonio de'
         ],
@@ -382,7 +331,6 @@ def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Option
             'criptoactivo inmobiliario', 'nft inmobiliario', 'activo tokenizado'
         ],
         
-        # Noticias específicas
         NewsCategory.NOTICIAS_HIPOTECAS: [
             'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria', 'crédito hipotecario',
             'euribor', 'tipo de interés', 'tasa hipotecaria', 'préstamo hipotecario',
@@ -406,7 +354,6 @@ def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Option
             'vivienda asequible', 'vivienda social', 'vpo', 'vivienda protegida'
         ],
         
-        # Precios
         NewsCategory.PRECIOS_VIVIENDA: [
             'precio de vivienda', 'precios de vivienda', 'precio vivienda', 'precios vivienda',
             'precio por m²', 'precio por metro', 'evolución precios', 'precio medio',
@@ -422,7 +369,6 @@ def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Option
             'valor suelo', 'coste suelo', 'terreno', 'solar', 'suelo urbanizable'
         ],
         
-        # Construcción
         NewsCategory.NOTICIAS_CONSTRUCCION: [
             'construcción', 'construcciones', 'obra', 'obras', 'edificación',
             'promoción inmobiliaria', 'promociones inmobiliarias', 'desarrollo inmobiliario',
@@ -441,7 +387,6 @@ def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Option
             'modular', 'industrializada', 'construcción industrializada'
         ],
         
-        # Alquiler y normativas
         NewsCategory.ALQUILER_VACACIONAL: [
             'alquiler vacacional', 'alquileres vacacionales', 'airbnb', 'booking',
             'turismo residencial', 'vivienda turística', 'apartamento turístico'
@@ -452,7 +397,6 @@ def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Option
             'legislación inmobiliaria', 'marco legal', 'ley urbanística'
         ],
         
-        # Análisis y tendencias
         NewsCategory.FUTURO_SECTOR_INMOBILIARIO: [
             'futuro sector', 'tendencias inmobiliarias', 'perspectivas sector',
             'evolución sector', 'previsión sector', 'proyección sector',
@@ -463,98 +407,78 @@ def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Option
             'corrección mercado', 'ajuste precios', 'caída precios'
         ],
         
-        # General (debe ir al final como fallback)
         NewsCategory.NOTICIAS_INMOBILIARIAS: [
             'inmobiliario', 'inmobiliaria', 'inmobiliarias', 'vivienda', 'viviendas',
             'propiedad', 'propiedades', 'inmueble', 'inmuebles', 'mercado inmobiliario'
         ],
     }
     
-    # Buscar coincidencias (de más específico a menos específico)
-    # Estrategia: buscar primero frases completas, luego palabras sueltas
-    # Priorizar categorías más específicas (FONDOS antes que GRANDES_INVERSIONES)
-    
-    # Separar categorías específicas de la general
     specific_categories = {k: v for k, v in keyword_mapping.items() 
                           if k != NewsCategory.NOTICIAS_INMOBILIARIAS}
     general_category = {NewsCategory.NOTICIAS_INMOBILIARIAS: keyword_mapping[NewsCategory.NOTICIAS_INMOBILIARIAS]}
     
-    # Ordenar categorías específicas: primero por número de keywords (menos = más específico),
-    # pero dar prioridad explícita a FONDOS_INVERSION_INMOBILIARIA
     def sort_key(item):
         category, keywords = item
-        # FONDOS_INVERSION_INMOBILIARIA tiene máxima prioridad
         if category == NewsCategory.FONDOS_INVERSION_INMOBILIARIA:
-            return (0, len(keywords))  # Prioridad 0, luego por número de keywords
+            return (0, len(keywords))
         else:
-            return (1, len(keywords))  # Otras categorías con prioridad 1
+            return (1, len(keywords))
     
     sorted_specific = sorted(specific_categories.items(), key=sort_key)
     
-    # Primera pasada: buscar frases completas en categorías específicas (más específicas primero)
     for category, keywords in sorted_specific:
         for keyword in keywords:
             if ' ' in keyword and keyword in text_to_analyze:
                 return category
     
-    # Segunda pasada: buscar palabras sueltas en categorías específicas
     for category, keywords in sorted_specific:
         for keyword in keywords:
             if ' ' not in keyword and keyword in text_to_analyze:
                 return category
     
-    # Última pasada: buscar en categoría general (fallback)
     for category, keywords in general_category.items():
         for keyword in keywords:
             if keyword in text_to_analyze:
                 return category
     
-    # Si no se encontró ninguna categoría, devolver la categoría general como fallback
     return NewsCategory.NOTICIAS_INMOBILIARIAS
-    
-    # Si no se encuentra ninguna coincidencia, retornar None
-    return None
 
 
 def _parse_published_date(entry) -> datetime:
     """
-    Intenta parsear la fecha de publicación de una entrada RSS.
+    Attempts to parse the publication date of an RSS entry.
     
     Args:
-        entry: Entrada del feed parseado por feedparser
+        entry: Feed entry parsed by feedparser
         
     Returns:
-        datetime en UTC, o datetime actual si no se puede parsear
+        datetime in UTC, or current datetime if parsing fails
     """
-    # Intentar usar published_parsed si está disponible
     if hasattr(entry, 'published_parsed') and entry.published_parsed:
         try:
-            # published_parsed es una struct_time
             return datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
         except (TypeError, ValueError):
             pass
     
-    # Si hay updated_parsed, usarlo
     if hasattr(entry, 'updated_parsed') and entry.updated_parsed:
         try:
             return datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
         except (TypeError, ValueError):
             pass
     
-    # Fallback: usar fecha actual
     return datetime.now(timezone.utc)
 
 
 async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 10) -> Dict[str, int]:
     """
-    Ingesta noticias desde todas las fuentes RSS configuradas.
+    Ingests news from all configured RSS sources.
     
     Args:
-        session: Sesión de base de datos async
-        max_items_per_source: Máximo número de items a procesar por fuente (por defecto 20)
+        session: Async database session
+        max_items_per_source: Maximum number of items to process per source (default 20)
         
     Returns:
-        Diccionario con nombre de fuente -> número de noticias insertadas
+        Dictionary with source name -> number of news items inserted
     """
     results = {}
     
@@ -567,9 +491,6 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
         inserted_count = 0
         
         try:
-            # Parsear el feed RSS/Atom
-            # Algunos feeds requieren User-Agent, así que primero descargamos con httpx
-            # y luego parseamos con feedparser
             async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
                 response = await client.get(
                     feed_url,
@@ -578,109 +499,78 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                     }
                 )
                 response.raise_for_status()
-                # Parsear el contenido descargado con feedparser
                 feed = feedparser.parse(response.text)
             
-            # Verificar que el feed se parseó correctamente
             if feed.bozo == 1 and feed.bozo_exception:
-                # Hay algún error en el parseo (silencioso para evitar output largo)
                 pass
             
-            # Verificar que el feed tiene entradas
             if not hasattr(feed, 'entries') or not feed.entries:
-                # Feed vacío (silencioso para evitar output largo)
                 results[source_name] = 0
                 continue
             
-            # Procesar TODAS las entradas del feed, pero filtrar por relevancia inmobiliaria
-            # Esto asegura que no perdamos noticias importantes que estén más abajo en el feed
-            entries_to_process = feed.entries  # Procesar todas las entradas
-            
-            # Contador para limitar cuántas noticias relevantes insertamos por fuente
+            entries_to_process = feed.entries
             relevant_count = 0
             
-            # Procesar cada entrada del feed
             for entry in entries_to_process:
-                # Si ya hemos insertado el máximo de noticias relevantes, parar
                 if relevant_count >= max_items_per_source:
                     break
-                # Extraer datos básicos
                 title = getattr(entry, 'title', 'Sin título')
                 link = getattr(entry, 'link', '')
                 
-                # Saltar si no hay título o URL
                 if not title or not link:
                     continue
                 
-                # Extraer resumen temporalmente para el filtro
                 temp_summary = None
                 if hasattr(entry, 'summary') and entry.summary:
                     temp_summary = entry.summary
                 elif hasattr(entry, 'description') and entry.description:
                     temp_summary = entry.description
                 
-                # Filtrar noticias: solo las relevantes al sector inmobiliario
                 if not _is_relevant_to_real_estate(title, temp_summary):
-                    continue  # Saltar esta noticia (no es inmobiliaria)
+                    continue
                 
-                # Incrementar contador de noticias relevantes encontradas
                 relevant_count += 1
-                
-                # Parsear fecha
                 published_at = _parse_published_date(entry)
-                
-                # Intentar obtener contenido completo del RSS primero
-                # Algunos feeds incluyen content:encoded o content con el artículo completo
                 full_content = None
                 
-                # Buscar content o content:encoded en el entry
                 if hasattr(entry, 'content') and entry.content:
-                    # Algunos feeds tienen content como lista
                     if isinstance(entry.content, list) and len(entry.content) > 0:
                         full_content = entry.content[0].get('value', '')
                     elif isinstance(entry.content, str):
                         full_content = entry.content
                 
-                # Buscar content:encoded (algunos feeds lo usan)
                 if not full_content:
                     for key in entry.keys():
                         if 'content' in key.lower() or 'encoded' in key.lower():
                             full_content = entry[key]
                             break
                 
-                # Decidir qué contenido usar (prioridad: RSS completo > scraping > resumen RSS)
                 raw_summary = None
                 
-                # Prioridad 1: Contenido completo del RSS (si está disponible)
                 if full_content:
                     raw_summary = _clean_html(full_content)
-                    # Si el contenido completo del RSS es muy corto (< 200 chars), 
-                    # probablemente no es el artículo completo, intentar scraping
                     if len(raw_summary) < 200:
-                        raw_summary = None  # Resetear para intentar scraping
+                        raw_summary = None
                 
-                # Prioridad 2: Intentar scraping del artículo (solo si no hay contenido completo del RSS)
                 if not raw_summary and link:
                     scraped_content = await _extract_article_content(link)
                     if scraped_content:
                         raw_summary = scraped_content
                 
-                # Prioridad 3: Usar resumen del RSS como fallback
                 if not raw_summary and temp_summary:
                     raw_summary = _clean_html(temp_summary)
                 
-                # Categorizar automáticamente basándose en palabras clave
+                if not _is_relevant_to_real_estate(title, raw_summary):
+                    continue
+                
                 detected_category = _categorize_by_keywords(title, raw_summary)
-                # Usar categoría detectada si existe, sino usar la categoría por defecto de la fuente
                 final_category = detected_category if detected_category else default_category
                 
-                # Verificar si ya existe una noticia con la misma URL
                 stmt = select(News).where(News.url == link)
                 result = await session.execute(stmt)
                 existing_news = result.scalar_one_or_none()
                 
                 if existing_news is None:
-                    # Crear nuevo registro News
                     new_news = News(
                         title=title,
                         source=source_label,
@@ -696,12 +586,10 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                     inserted_count += 1
         
         except Exception as e:
-            # Manejar errores de manera elegante (silencioso para evitar output largo)
             inserted_count = 0
         
         results[source_name] = inserted_count
     
-    # Commit todos los cambios
     if any(results.values()):
         await session.commit()
     

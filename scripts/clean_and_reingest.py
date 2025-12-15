@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
 """
-Script para limpiar todas las noticias y reingestar desde cero.
+Script to clean all news and reingest from scratch.
 
-⚠️ ADVERTENCIA: Este script elimina TODAS las noticias de la base de datos.
+⚠️ WARNING: This script deletes ALL news items from the database.
 """
 import asyncio
 import sys
 from pathlib import Path
 
-# Añadir el directorio raíz al path para importar app
 root_dir = Path(__file__).parent.parent
 sys.path.insert(0, str(root_dir))
 
@@ -21,42 +20,38 @@ from sqlalchemy import select, delete
 
 
 async def clean_and_reingest():
-    """Limpia todas las noticias y reingesta desde cero"""
+    """Cleans all news and reingests from scratch"""
     async with AsyncSessionLocal() as session:
         try:
-            # 1. Contar noticias existentes
-            print("📊 Verificando noticias existentes...")
+            print("📊 Checking existing news...")
             stmt = select(News)
             result = await session.execute(stmt)
             existing_news = result.scalars().all()
             total_existing = len(existing_news)
             
             if total_existing > 0:
-                print(f"⚠️  Se encontraron {total_existing} noticias en la base de datos")
-                print("🗑️  Eliminando todas las noticias...")
+                print(f"⚠️  Found {total_existing} news items in database")
+                print("🗑️  Deleting all news items...")
                 
-                # Eliminar todas las noticias
                 delete_stmt = delete(News)
                 await session.execute(delete_stmt)
                 await session.commit()
                 
-                print(f"✅ Se eliminaron {total_existing} noticias")
+                print(f"✅ Deleted {total_existing} news items")
             else:
-                print("ℹ️  No hay noticias para eliminar")
+                print("ℹ️  No news items to delete")
             
-            # 2. Reingestar noticias desde todas las fuentes RSS
-            print("\n📥 Ingestando noticias desde RSS con nuevo sistema de categorización...")
+            print("\n📥 Ingesting news from RSS with new categorization system...")
             results = await ingest_rss_sources(session)
             
             total_inserted = sum(results.values())
-            print(f"\n✅ Se insertaron {total_inserted} noticias nuevas")
+            print(f"\n✅ Inserted {total_inserted} new news items")
             
             for source, count in results.items():
                 if count > 0:
-                    print(f"   - {source}: {count} noticias")
+                    print(f"   - {source}: {count} news items")
             
-            # 3. Adaptar noticias al tono Althara
-            print("\n🎨 Adaptando noticias al tono Althara...")
+            print("\n🎨 Adapting news to Althara tone...")
             stmt = select(News).where(News.althara_summary.is_(None))
             result = await session.execute(stmt)
             pending_news = result.scalars().all()
@@ -72,13 +67,13 @@ async def clean_and_reingest():
                     news.althara_summary = althara_summary
                     adapted_count += 1
                 except Exception as e:
-                    print(f"   ⚠️  Error adaptando noticia {news.id}: {e}")
+                    print(f"   ⚠️  Error adapting news {news.id}: {e}")
                     continue
             
             if adapted_count > 0:
                 await session.commit()
             
-            print(f"✅ Se adaptaron {adapted_count} noticias al tono Althara")
+            print(f"✅ Adapted {adapted_count} news items to Althara tone")
             
             return {
                 "deleted": total_existing,
@@ -100,7 +95,7 @@ async def clean_and_reingest():
 
 if __name__ == "__main__":
     print("=" * 60)
-    print("⚠️  ADVERTENCIA: Este script eliminará TODAS las noticias")
+    print("⚠️  WARNING: This script will delete ALL news items")
     print("=" * 60)
     print()
     
@@ -108,12 +103,13 @@ if __name__ == "__main__":
     
     if result.get("success"):
         print("\n" + "=" * 60)
-        print("✅ Proceso completado exitosamente")
+        print("✅ Process completed successfully")
         print("=" * 60)
     else:
         print("\n" + "=" * 60)
-        print("❌ Error durante el proceso")
+        print("❌ Error during process")
         print("=" * 60)
     
     sys.exit(0 if result.get("success") else 1)
+
 

@@ -1,21 +1,20 @@
 #!/bin/bash
-# Build script para Render
-# Este script asegura que se use Python 3.11 y se instalen solo wheels precompilados
+# Build script for Render
+# This script ensures Python 3.11 is used and only precompiled wheels are installed
 
 set -e
 
-echo "🔧 Configurando entorno..."
+echo "🔧 Setting up environment..."
 
-# Asegurar que pip está actualizado
 pip install --upgrade pip setuptools wheel
 
-echo "📦 Instalando dependencias..."
+echo "📦 Installing dependencies..."
 
-# Instalar solo wheels precompilados cuando sea posible
 pip install --upgrade pip
 pip install --only-binary :all: -r requirements.txt 2>/dev/null || pip install -r requirements.txt
 
-echo "✅ Build completado!"
+echo "✅ Build completed!"
+
 
 
 

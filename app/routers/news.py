@@ -21,7 +21,7 @@ async def health_check():
 
 @router.post("/news", response_model=NewsRead, status_code=201)
 async def create_news(news_data: NewsCreate, db: AsyncSession = Depends(get_db)):
-    """Crear una nueva noticia"""
+    """Create a new news item"""
     new_news = News(**news_data.model_dump())
     db.add(new_news)
     await db.commit()
@@ -30,23 +30,22 @@ async def create_news(news_data: NewsCreate, db: AsyncSession = Depends(get_db))
 
 @router.get("/news", response_model=PaginatedResponse[NewsRead])
 async def list_news(
-    category: Optional[str] = Query(None, description="Filtrar por categoría"),
-    q: Optional[str] = Query(None, description="Buscar en título"),
-    from_date: Optional[datetime] = Query(None, description="Fecha desde (published_at >=)"),
-    to_date: Optional[datetime] = Query(None, description="Fecha hasta (published_at <=)"),
-    used_in_social: Optional[bool] = Query(None, description="Filtrar por usado en redes (true/false)"),
-    limit: int = Query(50, ge=1, le=200, description="Número máximo de noticias a devolver (1-200)"),
-    offset: int = Query(0, ge=0, description="Número de noticias a saltar para paginación"),
+    category: Optional[str] = Query(None, description="Filter by category"),
+    q: Optional[str] = Query(None, description="Search in title"),
+    from_date: Optional[datetime] = Query(None, description="Date from (published_at >=)"),
+    to_date: Optional[datetime] = Query(None, description="Date to (published_at <=)"),
+    used_in_social: Optional[bool] = Query(None, description="Filter by used in social media (true/false)"),
+    limit: int = Query(50, ge=1, le=200, description="Maximum number of news items to return (1-200)"),
+    offset: int = Query(0, ge=0, description="Number of news items to skip for pagination"),
     db: AsyncSession = Depends(get_db)
 ):
     """
-    Listar noticias con filtros opcionales y paginación.
+    List news items with optional filters and pagination.
     
-    Por defecto devuelve las últimas 50 noticias (las más recientes primero).
-    Usa `limit` y `offset` para paginación.
+    Returns the latest 50 news items by default (most recent first).
+    Uses `limit` and `offset` for pagination.
     """
     try:
-        # Query base
         query = select(News)
         count_query = select(func.count()).select_from(News)
         
@@ -64,30 +63,22 @@ async def list_news(
         if q:
             conditions.append(News.title.ilike(f"%{q}%"))
         
-        # Filtro por used_in_social si se especifica
         if used_in_social is not None:
             conditions.append(News.used_in_social == used_in_social)
         
-        # Aplicar condiciones a ambas queries
         if conditions:
             query = query.where(and_(*conditions))
             count_query = count_query.where(and_(*conditions))
         
-        # Ordenar por fecha (más recientes primero)
         query = query.order_by(News.published_at.desc())
-        
-        # Aplicar paginación
         query = query.limit(limit).offset(offset)
         
-        # Ejecutar queries
         result = await db.execute(query)
         news_list = result.scalars().all()
         
-        # Obtener total
         total_result = await db.execute(count_query)
         total = total_result.scalar_one()
         
-        # Calcular si hay más resultados
         has_more = (offset + limit) < total
         
         return PaginatedResponse[NewsRead](
@@ -98,26 +89,26 @@ async def list_news(
             has_more=has_more
         )
     except SQLAlchemyError as e:
-        logger.error(f"Error de base de datos al listar noticias: {str(e)}", exc_info=True)
+        logger.error(f"Database error listing news: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Error al acceder a la base de datos. Por favor, inténtalo de nuevo más tarde."
+            detail="Error accessing database. Please try again later."
         )
     except Exception as e:
-        logger.error(f"Error inesperado al listar noticias: {str(e)}", exc_info=True)
+        logger.error(f"Unexpected error listing news: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
-            detail="Error interno del servidor. Por favor, inténtalo de nuevo más tarde."
+            detail="Internal server error. Please try again later."
         )
 
 @router.get("/news/{id}", response_model=NewsRead)
 async def get_news(id: UUID, db: AsyncSession = Depends(get_db)):
-    """Obtener una noticia por ID"""
+    """Get a news item by ID"""
     query = select(News).where(News.id == id)
     result = await db.execute(query)
     news = result.scalar_one_or_none()
     
     if not news:
-        raise HTTPException(status_code=404, detail="Noticia no encontrada")
+        raise HTTPException(status_code=404, detail="News item not found")
     
     return news

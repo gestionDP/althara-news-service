@@ -1,7 +1,7 @@
 """
-Router de administración para gestionar la ingestión de noticias.
+Admin router for managing news ingestion.
 
-NOTA: Idealista NO tiene API de noticias, por eso solo usamos fuentes RSS.
+NOTE: Idealista does NOT have a news API, so we only use RSS sources.
 """
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,9 +17,9 @@ router = APIRouter(prefix="/api/admin", tags=["admin"])
 @router.post("/ingest")
 async def ingest_news(db: AsyncSession = Depends(get_db)):
     """
-    Endpoint principal para disparar la ingestión de noticias desde fuentes RSS.
+    Main endpoint to trigger news ingestion from RSS sources.
     
-    Ingesta noticias desde todas las fuentes RSS configuradas:
+    Ingests news from all configured RSS sources:
     - Expansion Inmobiliario
     - Cinco Días
     - El Economista
@@ -27,10 +27,9 @@ async def ingest_news(db: AsyncSession = Depends(get_db)):
     - BOE General
     - Observatorio Inmobiliario
     - Interempresas Construcción
-    - ArchDaily
     
     Returns:
-        JSON con el diccionario de fuentes y número de noticias insertadas
+        JSON with dictionary of sources and number of news items inserted
     """
     results = await ingest_rss_sources(db)
     return results
@@ -39,11 +38,11 @@ async def ingest_news(db: AsyncSession = Depends(get_db)):
 @router.post("/ingest/rss")
 async def ingest_rss(db: AsyncSession = Depends(get_db)):
     """
-    Endpoint alternativo para disparar la ingestión desde fuentes RSS.
-    Es un alias del endpoint principal /ingest.
+    Alternative endpoint to trigger ingestion from RSS sources.
+    Alias for the main /ingest endpoint.
     
     Returns:
-        JSON con el diccionario de fuentes y número de noticias insertadas
+        JSON with dictionary of sources and number of news items inserted
     """
     results = await ingest_rss_sources(db)
     return results
@@ -52,15 +51,14 @@ async def ingest_rss(db: AsyncSession = Depends(get_db)):
 @router.post("/adapt-pending")
 async def adapt_pending_news(db: AsyncSession = Depends(get_db)):
     """
-    Adapta noticias pendientes al tono Althara.
+    Adapt pending news items to Althara tone.
     
-    Busca todas las noticias que no tienen althara_summary y las adapta
-    usando el adapter de Althara. Guarda el resultado en althara_summary.
+    Finds all news items without althara_summary and adapts them
+    using the Althara adapter. Saves the result in althara_summary.
     
     Returns:
-        JSON con el número de noticias adaptadas
+        JSON with number of adapted news items
     """
-    # Buscar noticias con althara_summary IS NULL
     stmt = select(News).where(News.althara_summary.is_(None))
     result = await db.execute(stmt)
     pending_news = result.scalars().all()
@@ -69,48 +67,40 @@ async def adapt_pending_news(db: AsyncSession = Depends(get_db)):
     
     for news in pending_news:
         try:
-            # Construir el resumen Althara
             althara_summary = build_althara_summary(
                 title=news.title,
                 raw_summary=news.raw_summary,
                 category=news.category
             )
-            
-            # Actualizar la noticia
             news.althara_summary = althara_summary
             adapted_count += 1
-        
         except Exception as e:
-            # Si hay un error con una noticia, continuar con las demás
-            print(f"Error adaptando noticia {news.id}: {e}")
+            print(f"Error adapting news {news.id}: {e}")
             continue
     
-    # Commit todos los cambios
     if adapted_count > 0:
         await db.commit()
     
     return {
         "adapted": adapted_count,
-        "message": f"Se adaptaron {adapted_count} noticias al tono Althara"
+        "message": f"Adapted {adapted_count} news items to Althara tone"
     }
 
 
 @router.post("/ingest-and-adapt")
 async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
     """
-    Endpoint todo-en-uno: ingesta noticias y las adapta al tono Althara.
+    All-in-one endpoint: ingests news and adapts them to Althara tone.
     
-    Útil para automatización externa (servicios cloud, cron jobs remotos, etc.).
-    Ejecuta todo el pipeline: ingest → adapt → listo para usar.
+    Useful for external automation (cloud services, remote cron jobs, etc.).
+    Executes the full pipeline: ingest → adapt → ready to use.
     
     Returns:
-        JSON compacto con resumen del proceso (optimizado para cron jobs)
+        Compact JSON with process summary (optimized for cron jobs)
     """
-    # 1. Ingestar noticias (máximo 5 por fuente para evitar demasiadas)
     ingest_results = await ingest_rss_sources(db, max_items_per_source=10)
     total_inserted = sum(ingest_results.values())
     
-    # 2. Adaptar noticias pendientes
     stmt = select(News).where(News.althara_summary.is_(None))
     result = await db.execute(stmt)
     pending_news = result.scalars().all()
@@ -127,13 +117,11 @@ async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
             news.althara_summary = althara_summary
             adapted_count += 1
         except Exception as e:
-            # Solo registrar errores críticos, sin detalles largos
             continue
     
     if adapted_count > 0:
         await db.commit()
     
-    # Respuesta compacta para evitar "output too large" en cron jobs
     return {
         "status": "ok",
         "ingested": total_inserted,
@@ -145,20 +133,18 @@ async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
 @router.delete("/clean-all")
 async def clean_all_news(db: AsyncSession = Depends(get_db)):
     """
-    Elimina TODAS las noticias de la base de datos.
+    Deletes ALL news items from the database.
     
-    ⚠️ ADVERTENCIA: Esta operación es irreversible.
-    Útil para limpiar y re-ingerir con nuevas mejoras.
+    WARNING: This operation is irreversible.
+    Useful for cleaning and re-ingesting with new improvements.
     
     Returns:
-        JSON con el número de noticias eliminadas
+        JSON with number of deleted news items
     """
-    # Contar noticias antes de eliminar
     count_stmt = select(func.count()).select_from(News)
     count_result = await db.execute(count_stmt)
     total_count = count_result.scalar_one()
     
-    # Eliminar todas las noticias
     delete_stmt = delete(News)
     await db.execute(delete_stmt)
     await db.commit()
@@ -166,6 +152,6 @@ async def clean_all_news(db: AsyncSession = Depends(get_db)):
     return {
         "status": "ok",
         "deleted": total_count,
-        "message": f"Se eliminaron {total_count} noticias de la base de datos"
+        "message": f"Deleted {total_count} news items from database"
     }
 
