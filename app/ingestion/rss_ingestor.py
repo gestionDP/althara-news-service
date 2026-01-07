@@ -611,7 +611,16 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                 elif hasattr(entry, 'description') and entry.description:
                     temp_summary = entry.description
                 
-                if not _is_relevant_to_real_estate(title, temp_summary):
+                # Clean HTML from temp_summary before filtering
+                if temp_summary:
+                    temp_summary_clean = _clean_html(temp_summary)
+                else:
+                    temp_summary_clean = None
+                
+                # First filter: be more permissive - only filter based on title
+                # We'll do a stricter filter after getting full content
+                # This prevents rejecting news due to HTML or irrelevant content in RSS summary
+                if not _is_relevant_to_real_estate(title, None):
                     continue
                 
                 relevant_count += 1
