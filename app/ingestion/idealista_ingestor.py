@@ -7,12 +7,14 @@ avoiding duplicates.
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.ingestion.idealista_client import IdealistaClient, IdealistaNewsItem
+from app.ingestion.rss_ingestor import _is_relevant_to_real_estate
 from app.models.news import News
 
 
 async def ingest_idealista_news(session: AsyncSession) -> int:
     """
     Ingests news from Idealista.
+    Applies relevance filter to ensure only real estate news is inserted.
     
     Args:
         session: Async database session
@@ -26,6 +28,10 @@ async def ingest_idealista_news(session: AsyncSession) -> int:
     inserted_count = 0
     
     for item in items:
+        # Apply relevance filter - only insert real estate relevant news
+        if not _is_relevant_to_real_estate(item.title, item.raw_summary):
+            continue
+        
         stmt = select(News).where(News.url == item.url)
         result = await session.execute(stmt)
         existing_news = result.scalar_one_or_none()

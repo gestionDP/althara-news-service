@@ -10,6 +10,7 @@ import logging
 from app.database import get_db
 from app.models.news import News
 from app.schemas.news import NewsCreate, NewsRead, PaginatedResponse
+from app.ingestion.rss_ingestor import _is_relevant_to_real_estate
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,17 @@ async def health_check():
 
 @router.post("/news", response_model=NewsRead, status_code=201)
 async def create_news(news_data: NewsCreate, db: AsyncSession = Depends(get_db)):
-    """Create a new news item"""
+    """
+    Create a new news item.
+    Validates that the news is relevant to the real estate sector before inserting.
+    """
+    # Validate relevance to real estate sector
+    if not _is_relevant_to_real_estate(news_data.title, news_data.raw_summary):
+        raise HTTPException(
+            status_code=400,
+            detail="La noticia no es relevante para el sector inmobiliario. Solo se permiten noticias relacionadas con vivienda, inmobiliaria, hipotecas, alquiler, construcción inmobiliaria, etc."
+        )
+    
     new_news = News(**news_data.model_dump())
     db.add(new_news)
     await db.commit()

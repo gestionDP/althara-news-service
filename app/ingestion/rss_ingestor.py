@@ -112,6 +112,7 @@ def _clean_html(text: str) -> str:
 def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
     """
     Filters news to keep only those relevant to the real estate sector.
+    Uses strict filtering: requires specific real estate keywords, not generic terms.
     
     Args:
         title: News title
@@ -127,92 +128,156 @@ def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
     if summary:
         text_to_check += " " + summary.lower()
     
-    real_estate_keywords = [
-        'vivienda', 'viviendas', 'inmobiliario', 'inmobiliaria', 'inmobiliarias',
+    # STRICT: Only phrases that clearly indicate real estate context
+    # These are high-confidence indicators
+    strong_real_estate_phrases = [
+        'vivienda', 'viviendas', 
+        'inmobiliario', 'inmobiliaria', 'inmobiliarias',
+        'mercado inmobiliario', 'sector inmobiliario',
         'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria',
         'alquiler', 'alquileres', 'renta', 'rentas',
-        'precio', 'precios', 'valor', 'valores', 'coste', 'costes',
-        'compra', 'venta', 'comprar', 'vender', 'compraventa',
-        'mercado inmobiliario', 'sector inmobiliario',
+        'precio vivienda', 'precios vivienda', 'precio de vivienda', 'precios de vivienda',
+        'precio inmobiliario', 'precios inmobiliarios',
+        'valor inmobiliario', 'valores inmobiliarios',
         'propiedad', 'propiedades', 'inmueble', 'inmuebles',
-        'construcción', 'construcciones', 'obra', 'obras',
-        'promoción', 'promociones', 'desarrollo inmobiliario',
-        'inversión inmobiliaria', 'inversiones inmobiliarias',
-        'subasta', 'subastas', 'desahucio', 'desahucios',
+        'compraventa', 'compraventas', 'compra vivienda', 'venta vivienda',
+        'subasta inmobiliaria', 'subastas inmobiliarias',
+        'desahucio', 'desahucios',
         'okupa', 'okupas', 'okupación', 'okupaciones',
-        'normativa', 'normativas', 'ley vivienda', 'regulación vivienda',
-        'urbanismo', 'urbanización', 'urbanizaciones',
-        'suelo', 'terreno', 'solar', 'urbanizable',
-        'materiales construcción', 'coste construcción',
-        'fondo inversión', 'fondos inversión', 'socimi', 'reit',
+        'ley vivienda', 'regulación vivienda', 'normativa vivienda',
+        'fondo inversión inmobiliaria', 'fondos inversión inmobiliaria',
+        'socimi', 'socimis', 'reit', 'reits',
         'burbuja inmobiliaria', 'crisis vivienda',
-        'alquiler vacacional', 'airbnb', 'vivienda turística',
         'vpo', 'vivienda protegida', 'vivienda social',
-        'licencia', 'licencias', 'permiso construcción',
-        'arquitectura', 'arquitecto', 'arquitecta',
-        'reforma', 'reformas', 'rehabilitación',
-        'property', 'properties', 'real estate', 'housing',
-        'mortgage', 'mortgages', 'rent', 'rental',
-        'construction', 'building', 'development',
-        'investment', 'investor', 'investors'
+        'alquiler vacacional', 'airbnb', 'vivienda turística',
+        'real estate', 'housing market', 'property market',
+        'mortgage', 'mortgages',
     ]
     
-    exclude_keywords = [
-        'países más visitados', 'países visitados', 'turismo', 'viajeros', 'destinos turísticos',
-        'visitantes', 'turistas', 'atracciones turísticas',
-        'arquitecto', 'arquitectos', 'arquitectura', 'arquitectónico',
-        'obras más destacadas', 'recorrido por', 'estudio de arquitectura',
-        'doctor arquitecto', 'máster en arquitectura',
-        'logístico', 'logística', 'macrocentro logístico', 'centro logístico',
-        'almacén', 'almacenes', 'distribución logística',
+    # Medium confidence: construction/development but must be in real estate context
+    # These need to appear WITH other real estate terms
+    medium_keywords = [
+        'construcción', 'construcciones', 'obra', 'obras',
+        'promoción inmobiliaria', 'promociones inmobiliarias', 
+        'desarrollo inmobiliario', 'desarrollos inmobiliarios',
+        'urbanismo', 'urbanización', 'urbanizaciones',
+        'suelo', 'terreno', 'solar', 'urbanizable',
+        'reforma vivienda', 'reformas vivienda', 'rehabilitación vivienda',
+        'licencia construcción', 'permiso construcción',
+        'construction', 'building', 'development',
+    ]
+    
+    # STRICT EXCLUSIONS: Topics that are NEVER relevant to real estate
+    strong_exclusions = [
+        # Tourism (not real estate related)
+        'países más visitados', 'países visitados', 'turismo', 'viajeros', 
+        'destinos turísticos', 'visitantes', 'turistas', 'atracciones turísticas',
+        
+        # Architecture awards/premiums (not market news)
         'premio', 'premios', 'galardón', 'galardones', 'award', 'awards',
         'gana premio', 'ganan premio', 'premio de', 'premios de',
         'architecture awards', 'premios cerámica', 'premios internacionales',
         'excelencia', 'galardones en arquitectura',
+        'obras más destacadas', 'recorrido por', 'estudio de arquitectura',
+        'doctor arquitecto', 'máster en arquitectura',
+        
+        # Events/exhibitions (not market news)
         'feria', 'ferias', 'exposición', 'exposiciones', 'congreso',
         'big 5 global', 'participa en', 'participa exitosamente',
         'convocan', 'se convocan', 'convocatoria',
+        
+        # Non-real-estate industries
         'calzado', 'zapatos', 'panter', 'marca made in spain',
+        'logístico', 'logística', 'macrocentro logístico', 'centro logístico',
+        'almacén', 'almacenes', 'distribución logística',
+        
+        # Technical construction (not market news)
         'teja cerámica', 'cubiertas microventiladas', 'materiales nobles',
         'fachada viva', 'impresión 3d', 'impresa en 3d',
         'diseñar con sombra', 'arquitectura bioclimática', 'arquitectura sostenible',
         'transformación digital', 'building smart', 'tecniberia',
         'formación avanzada', 'gestión comercial', 'distribución profesional',
+        
+        # Accidents/crimes (not market news)
         'herido', 'heridos', 'accidente', 'accidentes', 'volcar', 'volcó',
         'atropello', 'atropellado', 'choque', 'colisión',
         'muerto', 'muertos', 'fallecido', 'fallecidos',
         'detenido', 'detenidos', 'arresto', 'arrestos',
         'robo', 'robos', 'hurto', 'hurtos',
+        
+        # Entertainment/culture (not market news)
         'película', 'películas', 'cine', 'actor', 'actriz',
         'música', 'concierto', 'conciertos', 'festival',
         'libro', 'libros', 'escritor', 'escritora',
         'museo', 'museos',
+        
+        # Sports (not market news)
         'fútbol', 'futbol', 'partido', 'partidos', 'gol', 'goles',
         'equipo', 'equipos', 'jugador', 'jugadores',
+        'baloncesto', 'tenis', 'deporte', 'deportes',
+        
+        # Politics (unless specifically about housing laws)
         'elecciones', 'votación', 'votaciones', 'partido político',
+        
+        # Weather/natural disasters (not market news)
         'incendio', 'incendios', 'inundación', 'inundaciones',
         'temporal', 'temporales', 'lluvia', 'lluvias',
+        
+        # Health/education (not market news)
         'hospital', 'hospitales', 'médico', 'médicos', 'enfermedad',
         'colegio', 'colegios', 'universidad', 'universidades', 'estudiante',
+        
+        # Transportation (not market news)
         'tráfico', 'trafico', 'carretera', 'carreteras', 'autopista',
         'camión', 'camiones', 'coche', 'coches', 'vehículo', 'vehículos',
         'mercedes', 'bmw', 'audi', 'ford', 'renault', 'seat', 'volvo',
         'cabrio', 'todoterreno', 'automóvil', 'automóviles', 'auto',
+        
+        # Vandalism/culture (not market news)
         'pintadas', 'grafiti', 'vandalismo',
         'homenaje', 'homenajes', 'acto', 'actos culturales',
+        
+        # Technology (not market news)
         'smartphone', 'tablet', 'iphone', 'android', 'app', 'aplicación',
-        'fútbol', 'futbol', 'baloncesto', 'tenis', 'deporte', 'deportes',
-        'partido', 'partidos', 'gol', 'goles', 'equipo', 'equipos'
     ]
     
-    for keyword in exclude_keywords:
+    # Check strong exclusions first (always exclude)
+    for keyword in strong_exclusions:
         if keyword in text_to_check:
             return False
     
-    for keyword in real_estate_keywords:
-        if keyword in text_to_check:
-            return True
+    # Check for strong real estate phrases (high confidence)
+    has_strong_keyword = False
+    for phrase in strong_real_estate_phrases:
+        if phrase in text_to_check:
+            has_strong_keyword = True
+            break
     
+    # If we have a strong keyword, it's relevant
+    if has_strong_keyword:
+        return True
+    
+    # If no strong keyword, check if we have medium keywords
+    # BUT only if they appear with context that suggests real estate
+    has_medium_keyword = False
+    for keyword in medium_keywords:
+        if keyword in text_to_check:
+            has_medium_keyword = True
+            break
+    
+    # Medium keywords alone are NOT enough - they need real estate context
+    # Check if text also contains any real estate indicator
+    if has_medium_keyword:
+        # Look for any additional real estate context
+        real_estate_context = [
+            'vivienda', 'inmobiliario', 'inmobiliaria', 'propiedad', 
+            'inmueble', 'residencial', 'comercial', 'oficina', 'local'
+        ]
+        for context_word in real_estate_context:
+            if context_word in text_to_check:
+                return True
+    
+    # If we get here, it's not relevant
     return False
 
 
@@ -286,13 +351,14 @@ async def _extract_article_content(url: str) -> Optional[str]:
 def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Optional[str]:
     """
     Categorizes news based on keywords from title and summary.
+    Uses specific phrases first, then falls back to general terms.
     
     Args:
         title: News title
         summary: News summary (optional)
         
     Returns:
-        Detected category or None if no match is found
+        Detected category or NOTICIAS_INMOBILIARIAS as default
     """
     from app.constants import NewsCategory
     
@@ -300,147 +366,156 @@ def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Option
     if summary:
         text_to_analyze += " " + summary.lower()
     
+    # Priority order: specific phrases first, then single words
+    # Categories are ordered by specificity (most specific first)
     keyword_mapping = {
+        # Very specific categories first
         NewsCategory.FONDOS_INVERSION_INMOBILIARIA: [
-            'experto en vivienda', 'experto inmobiliario', 'ceo de', 'director general de',
-            'fondo de inversión', 'fondos de inversión', 'fondo inmobiliario', 'fondos inmobiliarios',
-            'gestión de activos inmobiliarios', 'vehículo de inversión',
-            'gestión patrimonial', 'patrimonio inmobiliario', 'grupo inmobiliario',
-            'estrategia inversión', 'estrategia inmobiliaria', 'ciclo inmobiliario',
-            'gestiona millones', 'millones en patrimonio', 'patrimonio de millones',
-            'mazabi', 'merlin', 'colonial', 'metrovacesa', 'neinor', 'azora', 'hines',
-            'silicius',
-            'socimi', 'socimis', 'reit', 'reits', 'fondo cerrado', 'fondo abierto',
-            'experto', 'expertos', 'ceo', 'director general', 'directivo', 'directivos',
-            'patrimonio de'
+            # Multi-word phrases (highest priority)
+            'fondo de inversión inmobiliaria', 'fondos de inversión inmobiliaria',
+            'fondo inmobiliario', 'fondos inmobiliarios',
+            'gestión de activos inmobiliarios', 'vehículo de inversión inmobiliaria',
+            'patrimonio inmobiliario', 'grupo inmobiliario',
+            'socimi', 'socimis', 'reit', 'reits',
+            # Company names (specific to this category)
+            'mazabi', 'merlin', 'colonial', 'metrovacesa', 'neinor', 'azora', 'hines', 'silicius',
+            # Single words (lower priority)
+            'fondo cerrado', 'fondo abierto', 'gestión patrimonial',
         ],
         NewsCategory.GRANDES_INVERSIONES_INMOBILIARIAS: [
-            'gran inversión', 'grandes inversiones', 'inversión millonaria', 'millones de inversión',
-            'mega proyecto', 'macro proyecto', 'inversión masiva', 'operación inmobiliaria',
-            'transacción millonaria', 'adquisición millonaria',
-            'proyectos en españa', 'proyectos en londres', 'proyectos en parís'
+            'gran inversión inmobiliaria', 'grandes inversiones inmobiliarias',
+            'inversión millonaria inmobiliaria', 'millones de inversión inmobiliaria',
+            'mega proyecto inmobiliario', 'macro proyecto inmobiliario',
+            'inversión masiva inmobiliaria', 'operación inmobiliaria millonaria',
+            'transacción millonaria inmobiliaria', 'adquisición millonaria inmobiliaria',
         ],
         NewsCategory.MOVIMIENTOS_GRANDES_TENEDORES: [
-            'gran tenedor', 'grandes tenedores', 'inversor institucional', 'inversores institucionales',
-            'fondo buitre', 'fondos buitre', 'hedge fund', 'private equity',
+            'gran tenedor', 'grandes tenedores', 'inversor institucional inmobiliario',
+            'inversores institucionales inmobiliarios', 'fondo buitre', 'fondos buitre',
+            'hedge fund inmobiliario', 'private equity inmobiliario',
             'operador inmobiliario', 'operadores inmobiliarios',
-            'rotación de activos', 'desinversión', 'desinvirtiendo', 'reinversión'
+            'rotación de activos inmobiliarios', 'desinversión inmobiliaria',
         ],
         NewsCategory.TOKENIZATION_ACTIVOS: [
-            'tokenización', 'tokenizacion', 'token', 'blockchain inmobiliario',
-            'criptoactivo inmobiliario', 'nft inmobiliario', 'activo tokenizado'
+            'tokenización inmobiliaria', 'tokenizacion inmobiliaria',
+            'blockchain inmobiliario', 'criptoactivo inmobiliario',
+            'nft inmobiliario', 'activo tokenizado inmobiliario',
         ],
         
         NewsCategory.NOTICIAS_HIPOTECAS: [
-            'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria', 'crédito hipotecario',
-            'euribor', 'tipo de interés', 'tasa hipotecaria', 'préstamo hipotecario',
-            'subrogación', 'novación', 'cancelación hipoteca'
+            'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria',
+            'crédito hipotecario', 'euribor', 'tipo de interés hipotecario',
+            'tasa hipotecaria', 'préstamo hipotecario',
+            'subrogación hipotecaria', 'novación hipotecaria', 'cancelación hipoteca',
         ],
         NewsCategory.NOTICIAS_LEYES_OKUPAS: [
             'okupa', 'okupas', 'okupación', 'okupaciones', 'ocupación ilegal',
-            'ley okupas', 'ley antiokupas', 'desalojo', 'desalojos', 'usurpación'
+            'ley okupas', 'ley antiokupas', 'desalojo okupas', 'desalojos okupas',
         ],
         NewsCategory.NOTICIAS_BOE_SUBASTAS: [
-            'subasta', 'subastas', 'subasta judicial', 'subasta inmobiliaria',
-            'boe subasta', 'subasta pública', 'puja', 'remate'
+            'subasta inmobiliaria', 'subastas inmobiliarias',
+            'subasta judicial inmobiliaria', 'boe subasta',
+            'subasta pública inmobiliaria',
         ],
         NewsCategory.NOTICIAS_DESAHUCIOS: [
-            'desahucio', 'desahucios', 'lanzamiento', 'lanzamientos', 'ejecución hipotecaria',
-            'embargo', 'embargos', 'expulsión', 'desalojo forzoso'
+            'desahucio', 'desahucios', 'lanzamiento inmobiliario',
+            'ejecución hipotecaria', 'embargo inmobiliario',
+            'expulsión vivienda', 'desalojo forzoso',
         ],
         NewsCategory.FALTA_VIVIENDA: [
             'falta de vivienda', 'escasez de vivienda', 'déficit habitacional',
             'crisis de vivienda', 'problema de vivienda', 'acceso a vivienda',
-            'vivienda asequible', 'vivienda social', 'vpo', 'vivienda protegida'
+            'vivienda asequible', 'vivienda social', 'vpo', 'vivienda protegida',
         ],
         
         NewsCategory.PRECIOS_VIVIENDA: [
             'precio de vivienda', 'precios de vivienda', 'precio vivienda', 'precios vivienda',
-            'precio por m²', 'precio por metro', 'evolución precios', 'precio medio',
-            'precio medio vivienda', 'coste vivienda', 'valor vivienda', 'revalorización'
+            'precio por m²', 'precio por metro cuadrado', 'evolución precios vivienda',
+            'precio medio vivienda', 'coste vivienda', 'valor vivienda', 'revalorización vivienda',
         ],
         NewsCategory.PRECIOS_MATERIALES: [
-            'precio materiales', 'precios materiales', 'coste materiales', 'costes materiales',
-            'precio construcción', 'coste construcción', 'materiales construcción',
-            'cemento', 'acero', 'ladrillo', 'precio obra'
+            'precio materiales construcción', 'precios materiales construcción',
+            'coste materiales construcción', 'costes materiales construcción',
+            'precio construcción', 'coste construcción',
+            'precio cemento', 'precio acero', 'precio ladrillo',
         ],
         NewsCategory.PRECIOS_SUELO: [
             'precio suelo', 'precios suelo', 'precio del suelo', 'precios del suelo',
-            'valor suelo', 'coste suelo', 'terreno', 'solar', 'suelo urbanizable'
+            'valor suelo', 'coste suelo', 'suelo urbanizable',
         ],
         
         NewsCategory.NOTICIAS_CONSTRUCCION: [
-            'construcción', 'construcciones', 'obra', 'obras', 'edificación',
-            'promoción inmobiliaria', 'promociones inmobiliarias', 'desarrollo inmobiliario',
-            'obra nueva', 'vivienda nueva', 'nueva construcción'
+            'promoción inmobiliaria', 'promociones inmobiliarias',
+            'desarrollo inmobiliario', 'obra nueva vivienda',
+            'vivienda nueva', 'nueva construcción vivienda',
         ],
         NewsCategory.NOTICIAS_URBANIZACION: [
-            'urbanización', 'urbanizaciones', 'urbanismo', 'planeamiento',
-            'plan general', 'pgou', 'licencia urbanística', 'ordenación territorial'
+            'urbanización', 'urbanizaciones', 'urbanismo',
+            'plan general urbanístico', 'pgou', 'licencia urbanística',
+            'ordenación territorial',
         ],
         NewsCategory.NOVEDADES_CONSTRUCCION: [
             'nueva construcción', 'nuevas construcciones', 'innovación construcción',
-            'tecnología construcción', 'tendencias construcción', 'novedad construcción'
+            'tecnología construcción', 'tendencias construcción',
         ],
         NewsCategory.CONSTRUCCION_MODULAR: [
-            'construcción modular', 'vivienda modular', 'prefabricada', 'prefabricadas',
-            'modular', 'industrializada', 'construcción industrializada'
+            'construcción modular', 'vivienda modular', 'prefabricada',
+            'prefabricadas', 'construcción industrializada',
         ],
         
         NewsCategory.ALQUILER_VACACIONAL: [
-            'alquiler vacacional', 'alquileres vacacionales', 'airbnb', 'booking',
-            'turismo residencial', 'vivienda turística', 'apartamento turístico'
+            'alquiler vacacional', 'alquileres vacacionales', 'airbnb',
+            'turismo residencial', 'vivienda turística', 'apartamento turístico',
         ],
         NewsCategory.NORMATIVAS_VIVIENDAS: [
-            'normativa', 'normativas', 'ley vivienda', 'ley de vivienda',
-            'regulación vivienda', 'decreto vivienda', 'real decreto',
-            'legislación inmobiliaria', 'marco legal', 'ley urbanística'
+            'ley vivienda', 'ley de vivienda', 'normativa vivienda',
+            'regulación vivienda', 'decreto vivienda', 'real decreto vivienda',
+            'legislación inmobiliaria', 'ley urbanística',
         ],
         
         NewsCategory.FUTURO_SECTOR_INMOBILIARIO: [
-            'futuro sector', 'tendencias inmobiliarias', 'perspectivas sector',
-            'evolución sector', 'previsión sector', 'proyección sector',
-            'sector inmobiliario futuro', 'tendencias mercado'
+            'futuro sector inmobiliario', 'tendencias inmobiliarias',
+            'perspectivas sector inmobiliario', 'evolución sector inmobiliario',
+            'previsión sector inmobiliario', 'proyección sector inmobiliario',
         ],
         NewsCategory.BURBUJA_INMOBILIARIA: [
-            'burbuja inmobiliaria', 'burbuja', 'sobrevaloración', 'sobreprecio',
-            'corrección mercado', 'ajuste precios', 'caída precios'
+            'burbuja inmobiliaria', 'sobrevaloración inmobiliaria',
+            'corrección mercado inmobiliario', 'ajuste precios vivienda',
+            'caída precios vivienda',
         ],
         
+        # General category (lowest priority, used as fallback)
         NewsCategory.NOTICIAS_INMOBILIARIAS: [
-            'inmobiliario', 'inmobiliaria', 'inmobiliarias', 'vivienda', 'viviendas',
-            'propiedad', 'propiedades', 'inmueble', 'inmuebles', 'mercado inmobiliario'
+            'inmobiliario', 'inmobiliaria', 'inmobiliarias',
+            'vivienda', 'viviendas', 'propiedad', 'propiedades',
+            'inmueble', 'inmuebles', 'mercado inmobiliario',
         ],
     }
     
+    # Separate specific categories from general
     specific_categories = {k: v for k, v in keyword_mapping.items() 
                           if k != NewsCategory.NOTICIAS_INMOBILIARIAS}
     general_category = {NewsCategory.NOTICIAS_INMOBILIARIAS: keyword_mapping[NewsCategory.NOTICIAS_INMOBILIARIAS]}
     
-    def sort_key(item):
-        category, keywords = item
-        if category == NewsCategory.FONDOS_INVERSION_INMOBILIARIA:
-            return (0, len(keywords))
-        else:
-            return (1, len(keywords))
-    
-    sorted_specific = sorted(specific_categories.items(), key=sort_key)
-    
-    for category, keywords in sorted_specific:
+    # First pass: check multi-word phrases (most specific)
+    for category, keywords in specific_categories.items():
         for keyword in keywords:
             if ' ' in keyword and keyword in text_to_analyze:
                 return category
     
-    for category, keywords in sorted_specific:
+    # Second pass: check single words in specific categories
+    for category, keywords in specific_categories.items():
         for keyword in keywords:
             if ' ' not in keyword and keyword in text_to_analyze:
                 return category
     
+    # Third pass: check general category (fallback)
     for category, keywords in general_category.items():
         for keyword in keywords:
             if keyword in text_to_analyze:
                 return category
     
+    # Default fallback
     return NewsCategory.NOTICIAS_INMOBILIARIAS
 
 
