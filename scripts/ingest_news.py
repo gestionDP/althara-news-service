@@ -14,7 +14,7 @@ sys.path.insert(0, str(root_dir))
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import AsyncSessionLocal
 from app.ingestion.rss_ingestor import ingest_rss_sources
-from app.adapters.news_adapter import build_althara_summary
+from app.adapters.news_adapter import build_all_content
 from app.models.news import News
 from sqlalchemy import select
 
@@ -33,20 +33,29 @@ async def ingest_and_adapt():
                 if count > 0:
                     print(f"   - {source}: {count} news items")
             
-            print("\n🎨 Adapting news to Althara tone...")
-            stmt = select(News).where(News.althara_summary.is_(None))
+            print("\n🎨 Adapting news to Althara tone and generating Instagram posts...")
+            stmt = select(News).where(
+                (News.althara_summary.is_(None)) | (News.instagram_post.is_(None))
+            )
             result = await session.execute(stmt)
             pending_news = result.scalars().all()
             
             adapted_count = 0
             for news in pending_news:
                 try:
-                    althara_summary = build_althara_summary(
+                    althara_summary, instagram_post = build_all_content(
                         title=news.title,
                         raw_summary=news.raw_summary,
-                        category=news.category
+                        category=news.category,
+                        source=news.source,
+                        url=news.url
                     )
-                    news.althara_summary = althara_summary
+                    
+                    if not news.althara_summary:
+                        news.althara_summary = althara_summary
+                    if not news.instagram_post:
+                        news.instagram_post = instagram_post
+                    
                     adapted_count += 1
                 except Exception as e:
                     print(f"   ⚠️  Error adapting news {news.id}: {e}")
@@ -55,7 +64,7 @@ async def ingest_and_adapt():
             if adapted_count > 0:
                 await session.commit()
             
-            print(f"✅ Adapted {adapted_count} news items to Althara tone")
+            print(f"✅ Adapted {adapted_count} news items to Althara tone and generated Instagram posts")
             
             return {
                 "ingested": total_inserted,

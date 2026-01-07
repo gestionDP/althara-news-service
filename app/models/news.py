@@ -15,6 +15,7 @@ class News(Base):
     category = Column(String, nullable=False)
     raw_summary = Column(Text, nullable=True)
     althara_summary = Column(Text, nullable=True)
+    instagram_post = Column(Text, nullable=True)
     tags = Column(Text, nullable=True)
     used_in_social = Column(Boolean, default=False, nullable=False)
     provincia = Column(String, nullable=True)

@@ -527,3 +527,287 @@ def build_althara_summary(
         sections.append(keywords_str)
     
     return "\n".join(sections)
+
+
+def build_instagram_post(
+    title: str,
+    raw_summary: Optional[str],
+    category: Optional[str],
+    source: Optional[str] = None,
+    url: Optional[str] = None,
+    key_data: Optional[List[str]] = None,
+    seed: Optional[int] = None,
+) -> str:
+    """
+    Genera un post de Instagram en el tono Althara: minimalista, reflexivo y estratégico.
+    
+    Estructura:
+    - Pregunta provocadora o insight estratégico
+    - Dato clave (si hay)
+    - Título breve
+    - Reflexión estratégica
+    - Fuente y URL (con tono Althara)
+    - Hashtags mínimos
+    
+    Args:
+        title: Título de la noticia
+        raw_summary: Resumen original
+        category: Categoría de la noticia
+        source: Fuente de la noticia (opcional)
+        url: URL de la noticia (opcional)
+        key_data: Lista de datos clave extraídos
+        seed: Seed para determinismo
+        
+    Returns:
+        Post formateado para Instagram (máximo 2200 caracteres, idealmente 300-500)
+    """
+    if not key_data:
+        key_data = _extract_key_data(raw_summary)
+    
+    # Preguntas provocadoras por categoría (estilo Althara)
+    provocative_questions = {
+        "PRECIOS_VIVIENDA": [
+            "¿El precio comunica valor o solo VISIBILIDAD?",
+            "¿Quién ajusta posición antes de que el consenso llegue?",
+            "¿El dato refleja realidad o anticipa movimiento?",
+        ],
+        "FONDOS_INVERSION_INMOBILIARIA": [
+            "¿El capital sigue al consenso o lo anticipa?",
+            "¿Quién tiene acceso al siguiente movimiento?",
+            "¿La rotación de capital construye valor o solo VISIBILIDAD?",
+        ],
+        "GRANDES_INVERSIONES_INMOBILIARIAS": [
+            "¿La inversión comunica oportunidad o solo VISIBILIDAD?",
+            "¿Quién lee las señales antes del consenso?",
+            "¿El movimiento refleja estrategia o reacción?",
+        ],
+        "NOTICIAS_HIPOTECAS": [
+            "¿El crédito redefine acceso o solo VISIBILIDAD?",
+            "¿Quién opera con ventaja en el próximo tramo?",
+            "¿La reconfiguración del crédito construye valor o solo VISIBILIDAD?",
+        ],
+        "NOTICIAS_CONSTRUCCION": [
+            "¿El proyecto comunica viabilidad o solo VISIBILIDAD?",
+            "¿Quién anticipa la frontera entre viable y teórico?",
+            "¿La obra construye valor o solo VISIBILIDAD?",
+        ],
+        "NORMATIVAS_VIVIENDAS": [
+            "¿La regulación reordena acceso o solo VISIBILIDAD?",
+            "¿Quién conserva acceso operativo real?",
+            "¿La normativa construye valor o solo VISIBILIDAD?",
+        ],
+        "BURBUJA_INMOBILIARIA": [
+            "¿El consenso ha asumido las tensiones acumuladas?",
+            "¿Quién lee el gráfico antes del ajuste?",
+            "¿El dato comunica corrección o solo VISIBILIDAD?",
+        ],
+        "NOTICIAS_BOE_SUBASTAS": [
+            "¿El mercado ha fijado precio de consenso?",
+            "¿Quién lee el mapa de activos antes del consenso?",
+            "¿La subasta comunica oportunidad o solo VISIBILIDAD?",
+        ],
+        "NOTICIAS_DESAHUCIOS": [
+            "¿El proceso formaliza stock o solo VISIBILIDAD?",
+            "¿Quién lee el mapa de activos donde no hay consenso?",
+        ],
+        "NOTICIAS_LEYES_OKUPAS": [
+            "¿La ley reordena acceso o solo VISIBILIDAD?",
+            "¿Quién conserva acceso operativo real?",
+        ],
+        "ALQUILER_VACACIONAL": [
+            "¿El alquiler comunica oportunidad o solo VISIBILIDAD?",
+            "¿Quién lee la tendencia antes del consenso?",
+        ],
+    }
+    
+    # Insights estratégicos (alternativa a preguntas)
+    strategic_insights = {
+        "PRECIOS_VIVIENDA": [
+            "Detrás de la cifra, el patrón es un ajuste entre oferta limitada y demanda que aún no ha reprecificado del todo el riesgo del ciclo.",
+            "Lo relevante no es el precio comunicado, sino quién tiene acceso al siguiente movimiento.",
+        ],
+        "FONDOS_INVERSION_INMOBILIARIA": [
+            "El movimiento no es aislado: refleja una rotación silenciosa de capital hacia activos donde la asimetría de información sigue siendo aprovechable.",
+            "La oportunidad aparece en el desfase entre el dato y la reacción del mercado visible.",
+        ],
+        "GRANDES_INVERSIONES_INMOBILIARIAS": [
+            "El movimiento no es aislado: refleja una rotación silenciosa de capital hacia activos donde la asimetría de información sigue siendo aprovechable.",
+        ],
+        "NOTICIAS_HIPOTECAS": [
+            "El repliegue y la reconfiguración del crédito redefinen quién puede seguir operando con ventaja en el próximo tramo del ciclo.",
+            "Donde el mercado ve ajuste, Althara registra el punto exacto del desplazamiento.",
+        ],
+        "NOTICIAS_CONSTRUCCION": [
+            "Los costes y las reglas del juego redefinen la frontera entre proyectos viables y meros ejercicios teóricos de rentabilidad.",
+        ],
+        "NORMATIVAS_VIVIENDAS": [
+            "La regulación no solo corrige desequilibrios aparentes, sino que reordena qué actores conservan acceso operativo real al mercado.",
+        ],
+        "BURBUJA_INMOBILIARIA": [
+            "Más que un dato aislado, es una línea más en el gráfico de tensiones acumuladas que el consenso aún no ha terminado de asumir.",
+        ],
+        "NOTICIAS_BOE_SUBASTAS": [
+            "Estas entradas formalizan stock, pero sobre todo dibujan el mapa de activos donde el mercado aún no ha fijado un precio de consenso.",
+        ],
+        "NOTICIAS_DESAHUCIOS": [
+            "Estas entradas formalizan stock, pero sobre todo dibujan el mapa de activos donde el mercado aún no ha fijado un precio de consenso.",
+        ],
+    }
+    
+    # Usar seed para determinismo
+    if seed is None:
+        seed = hash(title) % 1000
+    
+    post_lines = []
+    
+    # Decidir si usar pregunta o insight (50/50)
+    use_question = (seed % 2 == 0)
+    
+    if use_question and category in provocative_questions:
+        questions = provocative_questions[category]
+        selected_question = questions[seed % len(questions)]
+        post_lines.append(selected_question)
+    elif category in strategic_insights:
+        insights = strategic_insights[category]
+        selected_insight = insights[seed % len(insights)]
+        post_lines.append(selected_insight)
+    else:
+        # Fallback genérico
+        post_lines.append("¿El dato comunica valor o solo VISIBILIDAD?")
+    
+    post_lines.append("")  # Espacio en blanco (estilo minimalista)
+    
+    # Dato clave (si hay, máximo 1-2 datos)
+    if key_data:
+        # Tomar solo el dato más relevante
+        main_data = key_data[0]
+        post_lines.append(main_data)
+        post_lines.append("")
+    
+    # Título adaptado (muy breve, máximo 1 línea)
+    title_clean = _clean_html(title)
+    # Simplificar título si es muy largo
+    if len(title_clean) > 80:
+        words = title_clean.split()
+        title_short = ""
+        for word in words[:10]:  # Máximo 10 palabras
+            if len(title_short + " " + word) <= 80:
+                title_short += " " + word if title_short else word
+            else:
+                break
+        title_clean = title_short
+    
+    post_lines.append(title_clean)
+    post_lines.append("")  # Espacio en blanco
+    
+    # Insight estratégico breve (1 línea, estilo Althara)
+    strategic_line = _build_strategic_line(category)
+    # Acortar si es muy largo
+    if len(strategic_line) > 150:
+        sentences = strategic_line.split('. ')
+        strategic_line = sentences[0] + "." if sentences else strategic_line[:150]
+    
+    post_lines.append(strategic_line)
+    
+    # Espacio en blanco antes de fuente
+    post_lines.append("")
+    
+    # Fuente y URL con tono Althara (minimalista, no promocional)
+    if source or url:
+        post_lines.append("—")
+        post_lines.append("")
+        
+        if source:
+            # Formato minimalista: solo el nombre de la fuente
+            post_lines.append(f"Fuente: {source}")
+        
+        if url:
+            # URL sin formato promocional, solo el link
+            post_lines.append(url)
+    
+    # Espacio antes de hashtags
+    post_lines.append("")
+    
+    # Hashtags mínimos y relevantes (máximo 5-7, estilo minimalista)
+    hashtags = _generate_minimal_hashtags(category, title)
+    if hashtags:
+        post_lines.append(" ".join(hashtags))
+    
+    # Unir todo
+    post = "\n".join(post_lines)
+    
+    # Asegurar que no exceda 2200 caracteres
+    if len(post) > 2200:
+        # Truncar manteniendo estructura
+        lines = post.split('\n')
+        truncated = []
+        current_length = 0
+        for line in lines:
+            if current_length + len(line) + 1 <= 2100:
+                truncated.append(line)
+                current_length += len(line) + 1
+            else:
+                break
+        post = "\n".join(truncated)
+        if hashtags:
+            post += "\n\n" + " ".join(hashtags[:3])
+    
+    return post
+
+
+def _generate_minimal_hashtags(
+    category: Optional[str],
+    title: str
+) -> List[str]:
+    """
+    Genera hashtags mínimos y relevantes (estilo Althara: máximo 5-7).
+    """
+    hashtags = []
+    
+    # Hashtags base por categoría (mínimos)
+    category_hashtags = {
+        "PRECIOS_VIVIENDA": ["#preciosvivienda", "#mercadoinmobiliario"],
+        "FONDOS_INVERSION_INMOBILIARIA": ["#fondosinversion", "#inversioninmobiliaria"],
+        "NOTICIAS_HIPOTECAS": ["#hipotecas", "#financiacion"],
+        "NOTICIAS_CONSTRUCCION": ["#construccion", "#desarrolloinmobiliario"],
+        "ALQUILER_VACACIONAL": ["#alquilervacacional"],
+        "NORMATIVAS_VIVIENDAS": ["#normativa", "#leyvivienda"],
+    }
+    
+    hashtags.extend(category_hashtags.get(category, ["#inmobiliaria"]))
+    
+    # Hashtag de marca (siempre)
+    hashtags.append("#althara")
+    
+    # Máximo 5-7 hashtags total (estilo minimalista)
+    return hashtags[:7]
+
+
+def build_all_content(
+    title: str,
+    raw_summary: Optional[str],
+    category: Optional[str],
+    source: Optional[str] = None,
+    url: Optional[str] = None,
+    seed: Optional[int] = None,
+) -> tuple[str, str]:
+    """
+    Genera tanto el resumen de Althara como el post de Instagram.
+    
+    Returns:
+        Tuple (althara_summary, instagram_post)
+    """
+    althara_summary = build_althara_summary(title, raw_summary, category, seed)
+    
+    key_data = _extract_key_data(raw_summary)
+    instagram_post = build_instagram_post(
+        title=title,
+        raw_summary=raw_summary,
+        category=category,
+        source=source,
+        url=url,
+        key_data=key_data,
+        seed=seed
+    )
+    
+    return althara_summary, instagram_post

@@ -11,6 +11,7 @@ class NewsBase(BaseModel):
     category: str
     raw_summary: Optional[str] = None
     althara_summary: Optional[str] = None
+    instagram_post: Optional[str] = None
     tags: Optional[str] = None
     used_in_social: bool = False
     provincia: Optional[str] = None

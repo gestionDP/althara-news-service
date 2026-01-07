@@ -9,7 +9,7 @@ from sqlalchemy import select, delete, func
 from app.database import get_db
 from app.ingestion.rss_ingestor import ingest_rss_sources
 from app.models.news import News
-from app.adapters.news_adapter import build_althara_summary
+from app.adapters.news_adapter import build_all_content
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -51,15 +51,17 @@ async def ingest_rss(db: AsyncSession = Depends(get_db)):
 @router.post("/adapt-pending")
 async def adapt_pending_news(db: AsyncSession = Depends(get_db)):
     """
-    Adapt pending news items to Althara tone.
+    Adapt pending news items to Althara tone and generate Instagram posts.
     
-    Finds all news items without althara_summary and adapts them
-    using the Althara adapter. Saves the result in althara_summary.
+    Finds all news items without althara_summary or instagram_post and adapts them
+    using the Althara adapter. Generates both althara_summary and instagram_post.
     
     Returns:
         JSON with number of adapted news items
     """
-    stmt = select(News).where(News.althara_summary.is_(None))
+    stmt = select(News).where(
+        (News.althara_summary.is_(None)) | (News.instagram_post.is_(None))
+    )
     result = await db.execute(stmt)
     pending_news = result.scalars().all()
     
@@ -67,12 +69,19 @@ async def adapt_pending_news(db: AsyncSession = Depends(get_db)):
     
     for news in pending_news:
         try:
-            althara_summary = build_althara_summary(
+            althara_summary, instagram_post = build_all_content(
                 title=news.title,
                 raw_summary=news.raw_summary,
-                category=news.category
+                category=news.category,
+                source=news.source,
+                url=news.url
             )
-            news.althara_summary = althara_summary
+            
+            if not news.althara_summary:
+                news.althara_summary = althara_summary
+            if not news.instagram_post:
+                news.instagram_post = instagram_post
+            
             adapted_count += 1
         except Exception as e:
             print(f"Error adapting news {news.id}: {e}")
@@ -83,7 +92,7 @@ async def adapt_pending_news(db: AsyncSession = Depends(get_db)):
     
     return {
         "adapted": adapted_count,
-        "message": f"Adapted {adapted_count} news items to Althara tone"
+        "message": f"Adapted {adapted_count} news items to Althara tone and generated Instagram posts"
     }
 
 
@@ -101,7 +110,9 @@ async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
     ingest_results = await ingest_rss_sources(db, max_items_per_source=10)
     total_inserted = sum(ingest_results.values())
     
-    stmt = select(News).where(News.althara_summary.is_(None))
+    stmt = select(News).where(
+        (News.althara_summary.is_(None)) | (News.instagram_post.is_(None))
+    )
     result = await db.execute(stmt)
     pending_news = result.scalars().all()
     
@@ -109,12 +120,19 @@ async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
     
     for news in pending_news:
         try:
-            althara_summary = build_althara_summary(
+            althara_summary, instagram_post = build_all_content(
                 title=news.title,
                 raw_summary=news.raw_summary,
-                category=news.category
+                category=news.category,
+                source=news.source,
+                url=news.url
             )
-            news.althara_summary = althara_summary
+            
+            if not news.althara_summary:
+                news.althara_summary = althara_summary
+            if not news.instagram_post:
+                news.instagram_post = instagram_post
+            
             adapted_count += 1
         except Exception as e:
             continue

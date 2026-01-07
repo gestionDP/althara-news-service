@@ -134,6 +134,7 @@ def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
         'vivienda', 'viviendas', 
         'inmobiliario', 'inmobiliaria', 'inmobiliarias',
         'mercado inmobiliario', 'sector inmobiliario',
+        'mercado residencial', 'mercados residenciales',
         'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria',
         'alquiler', 'alquileres', 'renta', 'rentas',
         'precio vivienda', 'precios vivienda', 'precio de vivienda', 'precios de vivienda',
@@ -152,6 +153,7 @@ def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
         'alquiler vacacional', 'airbnb', 'vivienda turística',
         'real estate', 'housing market', 'property market',
         'mortgage', 'mortgages',
+        'residencial', 'residenciales',  # Agregado para capturar "mercados residenciales"
     ]
     
     # Medium confidence: construction/development but must be in real estate context
@@ -239,6 +241,14 @@ def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
         
         # Technology (not market news)
         'smartphone', 'tablet', 'iphone', 'android', 'app', 'aplicación',
+        
+        # Opinion/history/philosophy (not market news)
+        'dignidad', 'chándal', 'carlos i', 'carlos i de inglaterra',
+        'rey', 'reina', 'monarca', 'monarquía',
+        'historia', 'histórico', 'histórica',
+        'filosofía', 'filosófico', 'filosófica',
+        'opinión', 'editorial', 'tribuna', 'columna',
+        'ensayo', 'reflexión', 'reflexiones',
     ]
     
     # Check strong exclusions first (always exclude)
