@@ -1290,14 +1290,14 @@ def _build_deck(title: str, hecho: str, category: Optional[str]) -> str:
 
 def _build_disclaimer(source: Optional[str], url: Optional[str]) -> str:
     """
-    Construye disclaimer de atribución.
+    Construye disclaimer de atribución (en inglés).
     """
-    source_name = source or "la fuente original"
-    url_text = f" Consulta la noticia original aquí: {url}." if url else ""
+    source_name = source or "the original source"
+    url_text = f" Read the original article here: {url}." if url else ""
     
     return (
-        f"Reestructurado por Althara a partir de información publicada en {source_name}, "
-        f"con fines de análisis y lectura de señales.{url_text}"
+        f"Restructured by Althara from information published in {source_name}, "
+        f"for analysis and signal reading purposes.{url_text}"
     )
 
 
