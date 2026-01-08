@@ -10,7 +10,7 @@ import re
 import html
 from datetime import datetime
 from textwrap import shorten
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 ALTHARA_CLOSERS = [
     "Lo relevante no es el titular, sino quién ajusta posición antes de que el consenso llegue.",
@@ -811,3 +811,752 @@ def build_all_content(
     )
     
     return althara_summary, instagram_post
+
+
+# ============================================================================
+# FUNCIONES PARA CONTENIDO ESTRUCTURADO (FORMATO JSON)
+# ============================================================================
+
+def build_structured_content(
+    title: str,
+    raw_summary: Optional[str],
+    category: Optional[str],
+    source: Optional[str] = None,
+    url: Optional[str] = None,
+    published_at: Optional[datetime] = None,
+    seed: Optional[int] = None,
+) -> Dict[str, Any]:
+    """
+    Genera contenido estructurado en formato JSON según el spec de Althara.
+    Completamente determinista, sin LLM.
+    
+    Returns:
+        Dict con estructura completa: source, web, instagram, qa
+    """
+    if seed is None:
+        seed = hash(title) % 1000
+    
+    # Extraer información base
+    key_data = _extract_key_data(raw_summary)
+    keywords = _extract_keywords(title, raw_summary)
+    
+    # Construir título Althara (interpretativo)
+    althara_title = _build_althara_title(title, category, seed)
+    
+    # Construir "hecho" (1-2 líneas, factual)
+    hecho = _build_hecho(title, raw_summary, key_data)
+    
+    # Construir "lectura Althara" (3-6 líneas)
+    lectura = _build_lectura_althara(title, raw_summary, category, key_data, keywords, seed)
+    
+    # Construir "implicaciones" (3-5 bullets)
+    implicaciones = _build_implicaciones(category, key_data, keywords, seed)
+    
+    # Construir "señales a vigilar" (2-4 bullets)
+    senales = _build_senales_a_vigilar(category, key_data, keywords, seed)
+    
+    # Construir deck (subtítulo breve)
+    deck = _build_deck(title, hecho, category)
+    
+    # Construir disclaimer
+    disclaimer = _build_disclaimer(source, url)
+    
+    # Construir Instagram
+    instagram = _build_instagram_structured(
+        title, raw_summary, category, source, url, key_data, seed
+    )
+    
+    # QA: verificar datos
+    qa = _build_qa(key_data, keywords, raw_summary, title)
+    
+    # Formato de fecha
+    published_date_str = None
+    if published_at:
+        if isinstance(published_at, datetime):
+            published_date_str = published_at.strftime("%Y-%m-%d")
+        else:
+            published_date_str = str(published_at)[:10]
+    
+    return {
+        "version": "2.0",
+        "source": {
+            "name": source or "Fuente no especificada",
+            "url": url or "",
+            "published_date": published_date_str or ""
+        },
+        "web": {
+            "title": althara_title,
+            "deck": deck,
+            "hecho": hecho,
+            "lectura": lectura,
+            "implicaciones": implicaciones,
+            "senales_a_vigilar": senales,
+            "disclaimer": disclaimer
+        },
+        "instagram": instagram,
+        "qa": qa,
+        "metadata": {
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "category": category or "NOTICIAS_INMOBILIARIAS",
+            "seed": seed
+        }
+    }
+
+
+def _build_althara_title(title: str, category: Optional[str], seed: int) -> str:
+    """
+    Construye título interpretativo Althara (no sensacionalista).
+    Usa templates por categoría o transforma el título original.
+    """
+    title_clean = _clean_html(title)
+    
+    # Templates por categoría para títulos interpretativos
+    title_templates = {
+        "PRECIOS_VIVIENDA": [
+            "El precio no comunica valor, comunica posición",
+            "Detrás de la cifra, el ajuste del ciclo",
+            "El dato no es el precio, es quién ajusta primero"
+        ],
+        "FONDOS_INVERSION_INMOBILIARIA": [
+            "El capital no sigue al consenso, lo anticipa",
+            "La rotación silenciosa de capital",
+            "Quién tiene acceso al siguiente movimiento"
+        ],
+        "NOTICIAS_HIPOTECAS": [
+            "El crédito redefine acceso, no solo condiciones",
+            "Quién opera con ventaja en el próximo tramo",
+            "La reconfiguración del crédito"
+        ],
+        "NORMATIVAS_VIVIENDAS": [
+            "La regulación reordena acceso, no solo corrige",
+            "Quién conserva acceso operativo real",
+            "La normativa no corrige, reordena"
+        ],
+        "NOTICIAS_CONSTRUCCION": [
+            "La frontera entre viable y teórico",
+            "Los costes redefinen la viabilidad",
+            "El proyecto no comunica viabilidad, comunica umbral"
+        ],
+        "NOTICIAS_INMOBILIARIAS": [
+            "La fricción no está en el acuerdo, sino en la integración",
+            "No es una noticia suelta: es otra pieza en la secuencia",
+            "El dato no va solo: se suma a una secuencia de señales"
+        ]
+    }
+    
+    # Si hay template para la categoría, usarlo
+    if category and category in title_templates:
+        templates = title_templates[category]
+        selected = templates[seed % len(templates)]
+        
+        # Intentar personalizar con palabras clave del título
+        title_words = set(title_clean.lower().split())
+        location_words = {'palma', 'madrid', 'barcelona', 'valencia', 'sevilla', 'bilbao'}
+        found_location = title_words.intersection(location_words)
+        
+        if found_location:
+            location = found_location.pop().capitalize()
+            return f"{location}: {selected.lower()}"
+        
+        return selected
+    
+    # Fallback: transformar título original
+    # Eliminar palabras sensacionalistas
+    sensacionalistas = ['impactante', 'brutal', 'bomba', 'escándalo', 'shock', 
+                       'revelación', 'exclusiva', 'última hora']
+    words = title_clean.split()
+    filtered_words = [w for w in words if w.lower() not in sensacionalistas]
+    
+    if len(filtered_words) < len(words):
+        title_clean = ' '.join(filtered_words)
+    
+    # Si es muy largo, acortar manteniendo esencia
+    if len(title_clean) > 80:
+        # Intentar mantener sujeto + verbo + complemento clave
+        sentences = re.split(r'[.!?]', title_clean)
+        if sentences:
+            title_clean = sentences[0].strip()
+            if len(title_clean) > 80:
+                words = title_clean.split()
+                title_clean = ' '.join(words[:12])
+    
+    return title_clean
+
+
+def _build_hecho(title: str, raw_summary: Optional[str], key_data: List[str]) -> str:
+    """
+    Construye el "hecho" (1-2 líneas, factual, sin opinión).
+    """
+    if not raw_summary:
+        return title.strip()
+    
+    cleaned = _clean_html(raw_summary)
+    
+    # Extraer primera oración factual
+    sentences = re.split(r'([.!?])\s+', cleaned)
+    factual_sentences = []
+    
+    for i in range(0, len(sentences) - 1, 2):
+        if i + 1 < len(sentences):
+            sentence = (sentences[i] + sentences[i + 1]).strip()
+            if sentence and len(sentence) > 20:
+                # Evitar oraciones con opinión
+                opinion_words = ['considera', 'cree', 'opina', 'piensa', 'sugiere']
+                if not any(word in sentence.lower() for word in opinion_words):
+                    factual_sentences.append(sentence)
+                    if len(factual_sentences) >= 2:
+                        break
+    
+    if factual_sentences:
+        hecho = ' '.join(factual_sentences[:2])
+        # Asegurar máximo 2 líneas (aprox 220 caracteres)
+        if len(hecho) > 220:
+            hecho = hecho[:220].rsplit('.', 1)[0] + '.'
+        return hecho
+    
+    # Fallback: usar título + inicio del resumen
+    combined = f"{title.strip()}. {cleaned[:150]}"
+    return shorten(combined, width=220, placeholder="…")
+
+
+def _build_lectura_althara(
+    title: str, 
+    raw_summary: Optional[str], 
+    category: Optional[str],
+    key_data: List[str],
+    keywords: List[str],
+    seed: int
+) -> str:
+    """
+    Construye "lectura Althara" (3-6 líneas: causalidad + fricción + "qué cambia").
+    """
+    # Usar la función existente _build_strategic_line como base
+    strategic_base = _build_strategic_line(category)
+    
+    # Expandir con contexto específico de la noticia
+    lectura_parts = [strategic_base]
+    
+    # Añadir línea sobre causalidad si hay datos clave
+    if key_data:
+        data_line = _build_causalidad_line(category, key_data[0])
+        if data_line:
+            lectura_parts.append(data_line)
+    
+    # Añadir línea sobre fricción/umbral
+    friccion_line = _build_friccion_line(category, title)
+    if friccion_line:
+        lectura_parts.append(friccion_line)
+    
+    # Añadir línea sobre "qué cambia"
+    cambio_line = _build_cambio_line(category, keywords)
+    if cambio_line:
+        lectura_parts.append(cambio_line)
+    
+    # Unir y asegurar 3-6 líneas
+    lectura = ' '.join(lectura_parts[:4])  # Máximo 4 partes = ~6 líneas
+    
+    # Asegurar longitud razonable (3-6 líneas = ~300-600 caracteres)
+    if len(lectura) > 600:
+        sentences = re.split(r'([.!?])\s+', lectura)
+        truncated = []
+        current_len = 0
+        for i in range(0, len(sentences) - 1, 2):
+            if i + 1 < len(sentences):
+                sentence = (sentences[i] + sentences[i + 1]).strip()
+                if current_len + len(sentence) <= 600:
+                    truncated.append(sentence)
+                    current_len += len(sentence)
+                else:
+                    break
+        lectura = ' '.join(truncated)
+    
+    return lectura
+
+
+def _build_causalidad_line(category: Optional[str], key_data: str) -> Optional[str]:
+    """Construye línea sobre causalidad basada en datos."""
+    causalidad_templates = {
+        "PRECIOS_VIVIENDA": [
+            "El dato {data} refleja un ajuste entre oferta limitada y demanda que aún no ha reprecificado el riesgo del ciclo.",
+            "Detrás de {data}, el patrón es una reconfiguración de acceso antes de que el consenso llegue."
+        ],
+        "FONDOS_INVERSION_INMOBILIARIA": [
+            "El movimiento {data} no es aislado: refleja una rotación silenciosa de capital.",
+            "La cifra {data} comunica quién tiene acceso al siguiente movimiento."
+        ]
+    }
+    
+    if category and category in causalidad_templates:
+        templates = causalidad_templates[category]
+        template = templates[hash(key_data) % len(templates)]
+        return template.format(data=key_data)
+    
+    return None
+
+
+def _build_friccion_line(category: Optional[str], title: str) -> Optional[str]:
+    """Construye línea sobre fricción/umbral."""
+    friccion_templates = {
+        "NORMATIVAS_VIVIENDAS": [
+            "La fricción aparece cuando la regulación reordena acceso sin definir umbrales operativos claros.",
+            "El umbral crítico: quién conserva acceso operativo real tras la reconfiguración."
+        ],
+        "NOTICIAS_CONSTRUCCION": [
+            "La fricción está en la frontera entre proyectos viables y ejercicios teóricos de rentabilidad.",
+            "El umbral: costes y reglas del juego que redefinen la viabilidad real."
+        ],
+        "NOTICIAS_INMOBILIARIAS": [
+            "La fricción no está en el acuerdo, sino en la integración operativa posterior.",
+            "El umbral crítico: el desfase entre anuncio e implementación efectiva."
+        ]
+    }
+    
+    if category and category in friccion_templates:
+        templates = friccion_templates[category]
+        return templates[hash(title) % len(templates)]
+    
+    return None
+
+
+def _build_cambio_line(category: Optional[str], keywords: List[str]) -> Optional[str]:
+    """Construye línea sobre 'qué cambia'."""
+    cambio_templates = {
+        "PRECIOS_VIVIENDA": [
+            "Lo que cambia: quién puede seguir operando con ventaja en el próximo tramo del ciclo.",
+            "El desplazamiento real: acceso efectivo a oportunidades antes de que el consenso llegue."
+        ],
+        "NORMATIVAS_VIVIENDAS": [
+            "Lo que cambia: qué actores conservan acceso operativo real al mercado.",
+            "El desplazamiento: reordenamiento de acceso, no solo corrección de desequilibrios."
+        ]
+    }
+    
+    if category and category in cambio_templates:
+        templates = cambio_templates[category]
+        return templates[hash(' '.join(keywords[:3]) if keywords else '') % len(templates)]
+    
+    return None
+
+
+def _build_implicaciones(
+    category: Optional[str], 
+    key_data: List[str], 
+    keywords: List[str],
+    seed: int
+) -> List[str]:
+    """
+    Construye "implicaciones" (3-5 bullets: efectos de 1er y 2º orden).
+    """
+    # Templates base por categoría
+    implicaciones_templates = {
+        "PRECIOS_VIVIENDA": [
+            "Riesgo de ajuste de posición si el mercado no ha reprecificado el riesgo del ciclo.",
+            "El coste real aparece después: acceso diferencial para quienes leen las señales antes del consenso.",
+            "Señal de mercado: la calidad del dato se mide por anticipación, no por consenso.",
+            "Efecto de segundo orden: reconfiguración de acceso a oportunidades antes de que el precio se estabilice."
+        ],
+        "FONDOS_INVERSION_INMOBILIARIA": [
+            "Riesgo de rotación silenciosa de capital hacia activos con asimetría de información aprovechable.",
+            "El coste real: acceso diferencial para quienes anticipan el movimiento antes del consenso.",
+            "Señal institucional: el capital no sigue al consenso, lo anticipa.",
+            "Efecto de segundo orden: reordenamiento de acceso a activos donde el mercado aún no ha fijado precio de consenso."
+        ],
+        "NORMATIVAS_VIVIENDAS": [
+            "Riesgo de tensión si el encaje operativo no queda definido con trazabilidad.",
+            "El coste real aparece después: ajustes, reclamaciones y pérdida de continuidad operativa.",
+            "Señal institucional: la calidad del proceso se mide por implementación, no por anuncio.",
+            "Efecto de segundo orden: reordenamiento de qué actores conservan acceso operativo real."
+        ],
+        "NOTICIAS_CONSTRUCCION": [
+            "Riesgo de redefinición de la frontera entre proyectos viables y ejercicios teóricos.",
+            "El coste real: compresión de plazos y riesgos allí donde el capital esté dispuesto a anticiparse.",
+            "Señal de mercado: los costes y reglas del juego redefinen la viabilidad real.",
+            "Efecto de segundo orden: industrialización y planeamiento que cambian formas y comprimen riesgos."
+        ],
+        "NOTICIAS_HIPOTECAS": [
+            "Riesgo de repliegue y reconfiguración del crédito que redefine acceso operativo.",
+            "El coste real: quién puede seguir operando con ventaja en el próximo tramo del ciclo.",
+            "Señal de mercado: el crédito reordena acceso, no solo condiciones.",
+            "Efecto de segundo orden: reconfiguración de quién tiene acceso efectivo a financiación."
+        ],
+        "NOTICIAS_INMOBILIARIAS": [
+            "Riesgo de fricción si la integración no queda definida con trazabilidad operativa.",
+            "El coste real aparece después: ajustes y pérdida de continuidad operativa.",
+            "Señal institucional: la calidad se mide por implementación, no por anuncio.",
+            "Efecto de segundo orden: reordenamiento de acceso a oportunidades reales."
+        ]
+    }
+    
+    # Seleccionar 3-5 implicaciones según seed
+    if category and category in implicaciones_templates:
+        templates = implicaciones_templates[category]
+        num_implicaciones = 3 + (seed % 3)  # 3-5 implicaciones
+        selected = []
+        for i in range(num_implicaciones):
+            idx = (seed + i) % len(templates)
+            selected.append(templates[idx])
+        return selected[:5]
+    
+    # Fallback genérico
+    return [
+        "Riesgo de ajuste si el mercado no ha asumido las tensiones acumuladas.",
+        "El coste real: acceso diferencial para quienes leen las señales antes del consenso.",
+        "Señal de mercado: la calidad se mide por anticipación, no por consenso."
+    ]
+
+
+def _build_senales_a_vigilar(
+    category: Optional[str],
+    key_data: List[str],
+    keywords: List[str],
+    seed: int
+) -> List[str]:
+    """
+    Construye "señales a vigilar" (2-4 bullets: métricas/decisiones verificables).
+    """
+    senales_templates = {
+        "PRECIOS_VIVIENDA": [
+            "Ajuste de posición de actores clave antes de que el consenso llegue.",
+            "Reprecificación del riesgo del ciclo en próximos movimientos de mercado.",
+            "Acceso diferencial a oportunidades antes de estabilización de precios."
+        ],
+        "FONDOS_INVERSION_INMOBILIARIA": [
+            "Rotación de capital hacia activos con asimetría de información.",
+            "Movimientos de grandes tenedores antes del consenso del mercado.",
+            "Fijación de precio de consenso en activos objetivo."
+        ],
+        "NORMATIVAS_VIVIENDAS": [
+            "Apertura de mesa efectiva con calendario y actas de negociación.",
+            "Documento final con definición concreta de umbrales operativos (no solo adscripción).",
+            "Implementación real vs. anuncio: métricas de continuidad operativa."
+        ],
+        "NOTICIAS_CONSTRUCCION": [
+            "Redefinición de frontera entre proyectos viables y teóricos.",
+            "Compresión de plazos y riesgos en proyectos con capital anticipado.",
+            "Cambios en reglas del juego que redefinen viabilidad real."
+        ],
+        "NOTICIAS_HIPOTECAS": [
+            "Reconfiguración de acceso a crédito en próximos tramos del ciclo.",
+            "Ajuste de posición de actores con ventaja operativa.",
+            "Reprecificación de riesgo crediticio antes del consenso."
+        ],
+        "NOTICIAS_INMOBILIARIAS": [
+            "Implementación efectiva vs. anuncio: métricas de continuidad operativa.",
+            "Definición concreta de umbrales operativos (no solo adscripción).",
+            "Ajuste de posición de actores clave antes del consenso."
+        ]
+    }
+    
+    if category and category in senales_templates:
+        templates = senales_templates[category]
+        num_senales = 2 + (seed % 3)  # 2-4 señales
+        selected = []
+        for i in range(num_senales):
+            idx = (seed + i) % len(templates)
+            selected.append(templates[idx])
+        return selected[:4]
+    
+    # Fallback
+    return [
+        "Ajuste de posición de actores clave antes del consenso.",
+        "Métricas de implementación efectiva vs. anuncio."
+    ]
+
+
+def _build_deck(title: str, hecho: str, category: Optional[str]) -> str:
+    """
+    Construye deck (subtítulo breve, 1 línea).
+    """
+    # Usar hecho pero más corto, o primera parte del título
+    if len(hecho) <= 120:
+        return hecho
+    
+    # Acortar hecho
+    sentences = hecho.split('. ')
+    if sentences:
+        deck = sentences[0]
+        if len(deck) > 120:
+            words = deck.split()
+            deck = ' '.join(words[:15])
+        return deck + '.'
+    
+    # Fallback: título acortado
+    title_clean = _clean_html(title)
+    if len(title_clean) > 120:
+        words = title_clean.split()
+        return ' '.join(words[:15])
+    return title_clean
+
+
+def _build_disclaimer(source: Optional[str], url: Optional[str]) -> str:
+    """
+    Construye disclaimer de atribución.
+    """
+    source_name = source or "la fuente original"
+    url_text = f" Consulta la noticia original aquí: {url}." if url else ""
+    
+    return (
+        f"Reestructurado por Althara a partir de información publicada en {source_name}, "
+        f"con fines de análisis y lectura de señales.{url_text}"
+    )
+
+
+def _build_instagram_structured(
+    title: str,
+    raw_summary: Optional[str],
+    category: Optional[str],
+    source: Optional[str],
+    url: Optional[str],
+    key_data: List[str],
+    seed: int
+) -> Dict[str, Any]:
+    """
+    Construye estructura completa de Instagram: hook, carousel, caption, cta.
+    """
+    # Hook (1 frase) - usar pregunta provocadora existente
+    provocative_questions = {
+        "PRECIOS_VIVIENDA": [
+            "¿El precio comunica valor o solo VISIBILIDAD?",
+            "¿Quién ajusta posición antes de que el consenso llegue?",
+        ],
+        "FONDOS_INVERSION_INMOBILIARIA": [
+            "¿El capital sigue al consenso o lo anticipa?",
+            "¿Quién tiene acceso al siguiente movimiento?",
+        ],
+        "NORMATIVAS_VIVIENDAS": [
+            "¿La regulación reordena acceso o solo VISIBILIDAD?",
+            "¿Quién conserva acceso operativo real?",
+        ],
+        "NOTICIAS_INMOBILIARIAS": [
+            "¿El riesgo no es el acuerdo, sino la integración?",
+            "¿Quién lee las señales antes del consenso?",
+        ]
+    }
+    
+    if category and category in provocative_questions:
+        questions = provocative_questions[category]
+        hook = questions[seed % len(questions)]
+    else:
+        hook = "¿El dato comunica valor o solo VISIBILIDAD?"
+    
+    # Carrusel slides (6-8 slides, 1 idea/slide, máximo 2 líneas)
+    carousel_slides = _build_carousel_slides(
+        title, raw_summary, category, key_data, seed
+    )
+    
+    # Caption (100-180 palabras)
+    caption = _build_instagram_caption(
+        title, raw_summary, category, source, url, key_data, seed
+    )
+    
+    # CTA (pregunta o "qué vigilar")
+    cta = _build_instagram_cta(category, seed)
+    
+    return {
+        "hook": hook,
+        "carousel_slides": carousel_slides,
+        "caption": caption,
+        "cta": cta
+    }
+
+
+def _build_carousel_slides(
+    title: str,
+    raw_summary: Optional[str],
+    category: Optional[str],
+    key_data: List[str],
+    seed: int
+) -> List[str]:
+    """
+    Construye slides del carrusel (6-8 slides, 1 idea/slide, máximo 2 líneas).
+    """
+    slides = []
+    
+    # Slide 1: Título/contexto
+    title_clean = _clean_html(title)
+    if len(title_clean) > 80:
+        words = title_clean.split()
+        title_clean = ' '.join(words[:10])
+    slides.append(title_clean)
+    
+    # Slide 2: Dato clave (si hay)
+    if key_data:
+        slides.append(f"Dato clave: {key_data[0]}")
+    
+    # Slide 3-5: Insights estratégicos
+    strategic_points = _build_strategic_line(category)
+    # Dividir en puntos
+    sentences = re.split(r'[.!?]', strategic_points)
+    for sentence in sentences[:3]:
+        sentence = sentence.strip()
+        if sentence and len(sentence) > 10:
+            if len(sentence) > 100:
+                words = sentence.split()
+                sentence = ' '.join(words[:15])
+            slides.append(sentence)
+            if len(slides) >= 5:
+                break
+    
+    # Slide 6-7: Implicaciones clave (breves)
+    keywords = _extract_keywords(title, raw_summary)
+    implicaciones = _build_implicaciones(category, key_data, keywords, seed)
+    for impl in implicaciones[:2]:
+        # Acortar a máximo 2 líneas
+        if len(impl) > 120:
+            words = impl.split()
+            impl = ' '.join(words[:15])
+        slides.append(impl)
+        if len(slides) >= 7:
+            break
+    
+    # Slide 8: Señal a vigilar
+    senales = _build_senales_a_vigilar(category, key_data, keywords, seed)
+    if senales:
+        senal = senales[0]
+        if len(senal) > 120:
+            words = senal.split()
+            senal = ' '.join(words[:15])
+        slides.append(senal)
+    
+    # Asegurar 6-8 slides
+    return slides[:8] if len(slides) >= 6 else slides + ["Vigilar implementación efectiva."] * (6 - len(slides))
+
+
+def _build_instagram_caption(
+    title: str,
+    raw_summary: Optional[str],
+    category: Optional[str],
+    source: Optional[str],
+    url: Optional[str],
+    key_data: List[str],
+    seed: int
+) -> str:
+    """
+    Construye caption de Instagram (100-180 palabras).
+    """
+    caption_parts = []
+    
+    # Primera parte: contexto breve
+    hecho = _build_hecho(title, raw_summary, key_data)
+    if len(hecho) > 150:
+        hecho = hecho[:150].rsplit('.', 1)[0] + '.'
+    caption_parts.append(hecho)
+    
+    # Segunda parte: lectura Althara (breve)
+    keywords = _extract_keywords(title, raw_summary)
+    lectura = _build_lectura_althara(title, raw_summary, category, key_data, keywords, seed)
+    # Acortar lectura para caption
+    sentences = re.split(r'[.!?]', lectura)
+    lectura_short = '. '.join(sentences[:2]) + '.' if len(sentences) >= 2 else lectura[:200]
+    caption_parts.append(lectura_short)
+    
+    # Tercera parte: qué vigilar
+    senales = _build_senales_a_vigilar(category, key_data, keywords, seed)
+    if senales:
+        vigilar_text = f"Qué vigilar: {senales[0].lower()}"
+        caption_parts.append(vigilar_text)
+    
+    # Cuarta parte: fuente
+    if source:
+        caption_parts.append(f"Fuente: {source}")
+    if url:
+        caption_parts.append(url)
+    
+    caption = '\n\n'.join(caption_parts)
+    
+    # Asegurar 100-180 palabras (aprox 600-1100 caracteres)
+    words = caption.split()
+    if len(words) > 180:
+        caption = ' '.join(words[:180])
+    elif len(words) < 100:
+        # Añadir más contenido si es muy corto
+        if category:
+            strategic = _build_strategic_line(category)
+            caption += f"\n\n{strategic[:200]}"
+    
+    return caption
+
+
+def _build_instagram_cta(category: Optional[str], seed: int) -> str:
+    """
+    Construye CTA (pregunta o "qué vigilar").
+    """
+    cta_templates = [
+        "¿Qué señal te parece más determinante?",
+        "¿Qué vigilar ahora?",
+        "¿Qué cambia realmente?",
+        "¿Quién lee las señales antes del consenso?",
+        "¿Qué umbral es crítico aquí?"
+    ]
+    
+    return cta_templates[seed % len(cta_templates)]
+
+
+def _build_qa(
+    key_data: List[str],
+    keywords: List[str],
+    raw_summary: Optional[str],
+    title: str
+) -> Dict[str, List[str]]:
+    """
+    Construye QA: facts_used y unknown_or_missing.
+    Verifica que los datos extraídos estén en el texto original.
+    """
+    facts_used = []
+    unknown_or_missing = []
+    
+    # Verificar que key_data esté en el texto original
+    full_text = (title + " " + (raw_summary or "")).lower()
+    
+    for data in key_data:
+        # Limpiar el dato para buscar
+        data_clean = re.sub(r'[^\w\s]', '', data.lower())
+        if data_clean in full_text or any(word in full_text for word in data_clean.split() if len(word) > 3):
+            facts_used.append(data)
+        else:
+            unknown_or_missing.append(f"Dato no verificado en fuente: {data}")
+    
+    # Añadir keywords relevantes a facts_used
+    if keywords:
+        facts_used.extend([f"Término clave: {kw}" for kw in keywords[:3]])
+    
+    # Si no hay datos verificados, indicarlo
+    if not facts_used:
+        facts_used.append("Información extraída del título y resumen general")
+    
+    # Indicar qué podría faltar según la categoría
+    if not key_data:
+        unknown_or_missing.append("Datos numéricos específicos no presentes en la fuente")
+    
+    return {
+        "facts_used": facts_used[:10],  # Máximo 10
+        "unknown_or_missing": unknown_or_missing[:5]  # Máximo 5
+    }
+
+
+def build_all_content_structured(
+    title: str,
+    raw_summary: Optional[str],
+    category: Optional[str],
+    source: Optional[str] = None,
+    url: Optional[str] = None,
+    published_at: Optional[datetime] = None,
+    seed: Optional[int] = None,
+) -> tuple[str, str, Dict[str, Any]]:
+    """
+    Genera TODO: resumen legacy, post legacy, Y contenido estructurado JSON.
+    
+    Returns:
+        Tuple (althara_summary, instagram_post, structured_content_dict)
+    """
+    # Generar contenido legacy (compatibilidad)
+    althara_summary, instagram_post = build_all_content(
+        title, raw_summary, category, source, url, seed
+    )
+    
+    # Generar contenido estructurado
+    structured = build_structured_content(
+        title, raw_summary, category, source, url, published_at, seed
+    )
+    
+    return althara_summary, instagram_post, structured

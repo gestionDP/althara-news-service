@@ -9,7 +9,7 @@ from sqlalchemy import select, delete, func
 from app.database import get_db
 from app.ingestion.rss_ingestor import ingest_rss_sources
 from app.models.news import News
-from app.adapters.news_adapter import build_all_content
+from app.adapters.news_adapter import build_all_content_structured
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -60,7 +60,9 @@ async def adapt_pending_news(db: AsyncSession = Depends(get_db)):
         JSON with number of adapted news items
     """
     stmt = select(News).where(
-        (News.althara_summary.is_(None)) | (News.instagram_post.is_(None))
+        (News.althara_summary.is_(None)) | 
+        (News.instagram_post.is_(None)) | 
+        (News.althara_content.is_(None))
     )
     result = await db.execute(stmt)
     pending_news = result.scalars().all()
@@ -69,18 +71,21 @@ async def adapt_pending_news(db: AsyncSession = Depends(get_db)):
     
     for news in pending_news:
         try:
-            althara_summary, instagram_post = build_all_content(
+            althara_summary, instagram_post, structured_content = build_all_content_structured(
                 title=news.title,
                 raw_summary=news.raw_summary,
                 category=news.category,
                 source=news.source,
-                url=news.url
+                url=news.url,
+                published_at=news.published_at
             )
             
             if not news.althara_summary:
                 news.althara_summary = althara_summary
             if not news.instagram_post:
                 news.instagram_post = instagram_post
+            if not news.althara_content:
+                news.althara_content = structured_content
             
             adapted_count += 1
         except Exception as e:
@@ -111,7 +116,9 @@ async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
     total_inserted = sum(ingest_results.values())
     
     stmt = select(News).where(
-        (News.althara_summary.is_(None)) | (News.instagram_post.is_(None))
+        (News.althara_summary.is_(None)) | 
+        (News.instagram_post.is_(None)) | 
+        (News.althara_content.is_(None))
     )
     result = await db.execute(stmt)
     pending_news = result.scalars().all()
@@ -120,18 +127,21 @@ async def ingest_and_adapt(db: AsyncSession = Depends(get_db)):
     
     for news in pending_news:
         try:
-            althara_summary, instagram_post = build_all_content(
+            althara_summary, instagram_post, structured_content = build_all_content_structured(
                 title=news.title,
                 raw_summary=news.raw_summary,
                 category=news.category,
                 source=news.source,
-                url=news.url
+                url=news.url,
+                published_at=news.published_at
             )
             
             if not news.althara_summary:
                 news.althara_summary = althara_summary
             if not news.instagram_post:
                 news.instagram_post = instagram_post
+            if not news.althara_content:
+                news.althara_content = structured_content
             
             adapted_count += 1
         except Exception as e:

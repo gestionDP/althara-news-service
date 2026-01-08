@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, DateTime, Text, Boolean
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSON
 from sqlalchemy.sql import func
 from app.database import Base
 import uuid
@@ -16,6 +16,7 @@ class News(Base):
     raw_summary = Column(Text, nullable=True)
     althara_summary = Column(Text, nullable=True)
     instagram_post = Column(Text, nullable=True)
+    althara_content = Column(JSON, nullable=True)
     tags = Column(Text, nullable=True)
     used_in_social = Column(Boolean, default=False, nullable=False)
     provincia = Column(String, nullable=True)

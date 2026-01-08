@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional, Generic, TypeVar, List
+from typing import Optional, Generic, TypeVar, List, Dict, Any
 from uuid import UUID
 
 class NewsBase(BaseModel):
@@ -12,6 +12,7 @@ class NewsBase(BaseModel):
     raw_summary: Optional[str] = None
     althara_summary: Optional[str] = None
     instagram_post: Optional[str] = None
+    althara_content: Optional[Dict[str, Any]] = None
     tags: Optional[str] = None
     used_in_social: bool = False
     provincia: Optional[str] = None

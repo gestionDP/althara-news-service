@@ -24,3 +24,5 @@ for title in test_titles:
     status = "RELEVANT" if result else "REJECTED"
     print(f"[{status}] {title}")
 
+
+
