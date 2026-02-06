@@ -29,13 +29,12 @@
           <a href="{{ news.url }}" target="_blank" rel="noopener" class="link-source">Fuente ↗</a>
         </div>
         {% if news.raw_summary %}
-        <div class="news-summary collapsed" id="summary" data-full="{{ news.raw_summary|e }}">
-          {{ news.raw_summary[:400] }}{% if news.raw_summary|length > 400 %}…{% endif %}
+        <div class="news-summary collapsed" id="summary">
+          {{ (news.raw_summary | format_paragraphs) | safe }}
         </div>
         <button type="button" class="btn-ver-mas" id="btnVerMas" onclick="toggleSummary()">Ver más</button>
         {% endif %}
         <div class="news-actions">
-          <button class="btn-primary btn-generate-ig" data-news-id="{{ news.id }}" title="Crear el primer borrador de IG">Crear IG</button>
           <button class="btn btn-variants" data-news-id="{{ news.id }}" title="Genera 3 borradores alternativos para elegir el mejor">Generar variantes</button>
         </div>
         <p class="news-actions-help">Generar variantes: crea varios borradores con distinto estilo. El número real se muestra al completar.</p>
@@ -66,11 +65,8 @@ function showToast(msg, type) {
 function toggleSummary() {
   const el = document.getElementById('summary');
   const btn = document.getElementById('btnVerMas');
-  if (el.classList.contains('collapsed')) {
-    el.textContent = el.dataset.full; el.classList.remove('collapsed'); btn.textContent = 'Ver menos';
-  } else {
-    el.textContent = el.dataset.full.slice(0, 400) + (el.dataset.full.length > 400 ? '…' : ''); el.classList.add('collapsed'); btn.textContent = 'Ver más';
-  }
+  el.classList.toggle('collapsed');
+  btn.textContent = el.classList.contains('collapsed') ? 'Ver más' : 'Ver menos';
 }
 document.querySelector('.btn-generate-ig').onclick = async () => {
   const r = await fetch(`/api/ig/news/{{ news.id }}/generate`, { method: 'POST' });

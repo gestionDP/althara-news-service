@@ -6,7 +6,7 @@
     <div class="container">
       <div class="header-row">
         <div class="header-left">
-          <div class="brand-switch">
+          <div class="brand-switch" style="flex-shrink: 0">
             <select id="brandSelect" onchange="switchBrand(this.value)">
               {% for key, config in brands.items() %}
               <option value="{{ key }}" {% if key == brand %}selected{% endif %}>{{ config.display }}</option>
@@ -77,7 +77,6 @@
             <a href="/ui/{{ brand }}/draft/{{ item.first_draft_id }}" class="btn-primary" title="Abrir último borrador para editar">Editar IG</a>
             <a href="/ui/{{ brand }}/news/{{ item.news.id }}" class="btn-secondary" title="Ver noticia y borradores (variantes)">Ver</a>
             {% else %}
-            <button type="button" class="btn-primary btn-generate-ig" data-news-id="{{ item.news.id }}" title="Crear primer borrador IG para esta noticia">Crear IG</button>
             {% endif %}
             <a href="{{ item.news.url }}" target="_blank" rel="noopener" class="btn-ghost-sm" title="Abrir noticia original en nueva pestaña">Fuente ↗</a>
           </div>
@@ -94,7 +93,7 @@
 <div class="modal-overlay hidden" id="generateModal">
   <div class="modal">
     <h3>Generar más noticias</h3>
-    <p>Se ingestarán fuentes RSS (máx. 5 por fuente). Se generará <strong>1 borrador por noticia nueva</strong>. ¿Continuar?</p>
+    <p>Se ingestarán fuentes RSS (máx. 5 por fuente). Se generará <strong>1 borrador IG por noticia nueva</strong>. ¿Continuar?</p>
     <div class="modal-actions">
       <button type="button" class="btn" onclick="closeGenerateModal()">Cancelar</button>
       <button type="button" class="btn-generate-more" onclick="confirmGenerate()">Continuar</button>

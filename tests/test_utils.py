@@ -23,6 +23,14 @@ def test_strip_html_tags_empty():
     assert strip_html_tags(None) == ""
 
 
+def test_strip_html_tags_fixes_mojibake():
+    """ftfy repairs common encoding errors (e.g. UTF-8 misinterpreted as Latin-1)."""
+    # "participación" mojibake: UTF-8 bytes decoded as Latin-1
+    mojibake = "participaci\u00c3\u00b3n"  # participación
+    result = strip_html_tags(mojibake)
+    assert "ó" in result or "participación" in result or "participacion" in result
+
+
 def test_strip_html_tags_whitespace():
     html = "  <p>  foo  </p>  \n  bar  "
     result = strip_html_tags(html)

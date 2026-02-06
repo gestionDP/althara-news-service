@@ -24,6 +24,9 @@ a { color: var(--accent); text-decoration: none; }
 a:hover { text-decoration: underline; }
 
 .container { max-width: 1160px; margin: 0 auto; padding: 0 var(--s24); }
+@media (max-width: 640px) {
+  .container { padding: 0 var(--s16); }
+}
 
 /* Selector */
 .selector-container { max-width: 520px; margin: 4rem auto; padding: var(--s32); text-align: center; }
@@ -53,7 +56,15 @@ a:hover { text-decoration: underline; }
   display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap;
   gap: var(--s16); padding: var(--s16) 0;
 }
-.portal-header .header-left { display: flex; align-items: center; gap: var(--s16); flex-wrap: wrap; }
+@media (max-width: 640px) {
+  .portal-header .header-row { padding: var(--s12) 0; }
+  .portal-header .header-left { width: 100%; }
+  .portal-header .search-wrap { flex: 1; min-width: 0; }
+  .portal-header .search-wrap input { width: 100%; min-width: 0; }
+  .portal-header .header-right { width: 100%; justify-content: flex-start; }
+  .btn-generate-more { font-size: 13px; padding: var(--s8) var(--s16); }
+}
+.portal-header .header-left { display: flex; align-items: center; gap: var(--s16); flex-wrap: wrap; min-width: 0; }
 .portal-header .brand-switch {
   display: flex; align-items: center; gap: var(--s8);
 }
@@ -62,9 +73,9 @@ a:hover { text-decoration: underline; }
   border: 1px solid var(--border); background: var(--bg); color: var(--text);
   font-size: 14px; cursor: pointer;
 }
-.portal-header .search-wrap { position: relative; }
+.portal-header .search-wrap { position: relative; flex: 1; min-width: 120px; }
 .portal-header .search-wrap input {
-  padding: var(--s8) var(--s16) var(--s8) 36px; width: 240px;
+  padding: var(--s8) var(--s16) var(--s8) 36px; width: 240px; max-width: 100%;
   border-radius: 999px; border: 1px solid rgba(255,255,255,0.08);
   background: var(--bg); color: var(--text); font-size: 14px;
 }
@@ -94,6 +105,10 @@ a:hover { text-decoration: underline; }
 .portal-header .subheader {
   display: flex; align-items: center; gap: var(--s8);
   padding-bottom: var(--s16);
+}
+@media (max-width: 640px) {
+  .portal-header .subheader { padding-bottom: var(--s12); }
+  .portal-header .tab { padding: var(--s8) var(--s12); font-size: 13px; }
 }
 .portal-header .tabs { display: flex; gap: 0; }
 .portal-header .tab {
@@ -125,11 +140,17 @@ a:hover { text-decoration: underline; }
 .portal-main { padding: var(--s24) 0; }
 .news-list { list-style: none; padding: 0; margin: 0; }
 .news-row {
-  display: flex; align-items: center; justify-content: space-between; gap: var(--s16);
-  padding: var(--s16); border-radius: 12px;
-  border: 1px solid var(--border); margin-bottom: var(--s8);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s16);
+  padding: var(--s16);
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  margin-bottom: var(--s8);
   transition: border-color 0.2s;
 }
+
 .news-row:hover { border-color: var(--border-focus); }
 .news-row .row-main {
   flex: 1; min-width: 0; cursor: pointer;
@@ -139,8 +160,8 @@ a:hover { text-decoration: underline; }
   font-size: 12px; color: var(--muted); margin-bottom: var(--s8);
 }
 .news-row .meta-line span + span::before { content: " · "; color: var(--muted); }
-.news-row h3 { margin: 0; font-size: 14px; font-weight: 500; line-height: 1.4; }
-.news-row .row-actions { display: flex; align-items: center; gap: var(--s8); flex-shrink: 0; }
+.news-row h3 { margin: 0; font-size: 14px; font-weight: 500; line-height: 1.4; word-break: break-word; }
+.news-row .row-actions { display: flex; align-items: center; gap: var(--s8); flex-shrink: 0; flex-wrap: wrap; }
 .news-row .btn-primary {
   padding: var(--s8) var(--s16); border-radius: 999px;
   background: var(--accent); color: white; border: none;
@@ -159,6 +180,31 @@ a:hover { text-decoration: underline; }
   font-size: 12px; text-decoration: none;
 }
 .news-row .btn-ghost-sm:hover { color: var(--accent); }
+
+/* News card responsive: row-main arriba, row-actions abajo en columna */
+@media (max-width: 768px) {
+  ul.news-list .news-row {
+    flex-direction: column !important;
+    align-items: stretch;
+    gap: var(--s12);
+  }
+  .news-row .row-main { min-width: unset; }
+  .news-row .row-actions {
+    flex-direction: column; align-items: stretch;
+    gap: var(--s8); padding-top: var(--s8); border-top: 1px solid var(--border);
+  }
+  .news-row .row-actions .btn-primary,
+  .news-row .row-actions .btn-secondary,
+  .news-row .row-actions .btn-ghost-sm {
+    width: 100%; text-align: center;
+  }
+  .news-row .btn-primary, .news-row .btn-secondary {
+    padding: var(--s8) var(--s12); font-size: 12px;
+  }
+  .news-row .btn-ghost-sm { padding: var(--s8); font-size: 12px; }
+  .news-row h3 { font-size: 13px; line-height: 1.4; }
+}
+
 .news-row .btn-menu {
   width: 32px; height: 32px; padding: 0; border-radius: 50%;
   border: 1px solid var(--border); background: var(--bg);
@@ -204,6 +250,10 @@ a:hover { text-decoration: underline; }
   display: flex; align-items: center; justify-content: center; z-index: 150;
   padding: var(--s24);
 }
+@media (max-width: 640px) {
+  .modal-overlay { padding: var(--s16); }
+  .modal { padding: var(--s20); }
+}
 .modal-overlay.hidden { display: none; }
 .modal {
   background: var(--bg-card); border: 1px solid var(--border);
@@ -220,10 +270,16 @@ a:hover { text-decoration: underline; }
 .news-detail .news-meta span + span::before { content: " · "; }
 .news-detail .news-summary {
   margin: var(--s24) 0; padding: var(--s24); background: var(--bg-card);
-  border-radius: 12px; font-size: 14px; line-height: 1.6;
-  border: 1px solid var(--border);
+  border-radius: 12px; font-size: 15px; line-height: 1.7;
+  border: 1px solid var(--border); max-width: 56em;
 }
-.news-detail .news-summary.collapsed { max-height: 96px; overflow: hidden; position: relative; }
+.news-detail .news-summary p {
+  margin: 0 0 1em 0;
+}
+.news-detail .news-summary p:last-child {
+  margin-bottom: 0;
+}
+.news-detail .news-summary.collapsed { max-height: 10em; overflow: hidden; position: relative; }
 .news-detail .news-summary.collapsed::after {
   content: ""; position: absolute; bottom: 0; left: 0; right: 0;
   height: 40px; background: linear-gradient(transparent, var(--bg-card));

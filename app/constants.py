@@ -221,26 +221,30 @@ DENY_KEYWORDS: Final[list[str]] = [
     # Celebrity / soft content
     "casa de", "mansión", "mansion", "famoso", "influencer",
     # Promotions / commerce
-    "oferta", "rebaja", "descuento", "chollo", "black friday", "prime day",
+    "rebaja", "descuento", "chollo", "black friday", "prime day",
+    # Off-topic: transport, crime, sport, etc.
+    "bici", "bicicleta", "bicipalma", "rebalanceo", "flota entre estaciones",
+    "coche", "coches", "robo", "robos", "detenidos", "detenido", "policía", "policia",
+    "fútbol", "futbol", "deporte", "deportes", "partido", "gol", "liga",
+    "sanidad", "hospital", "covid", "vacuna", "elecciones", "político", "politico",
 ]
 
 ALLOW_KEYWORDS: Final[list[str]] = [
     # Market & prices
-    "compraventa", "ventas", "transacciones", "operaciones", "demanda", "oferta",
-    "precio", "precios", "tasación", "tasacion", "valoración", "valoracion",
-    "stock", "obra nueva", "visados", "promotor", "promotora", "vivienda",
+    "vivienda", "inmueble", "inmobiliario", "compraventa", "tasación", "tasacion",
+    "precio", "precios", "obra nueva", "visados", "promotor", "promotora",
     # Rent
     "alquiler", "renta", "arrendamiento",
     # Financing
-    "hipoteca", "hipotecas", "euríbor", "euribor", "tipo de interés", "tipo de interes",
-    "crédito", "credito", "concesión", "concesion", "morosidad",
+    "hipoteca", "hipotecas", "euríbor", "euribor", "crédito", "credito", "morosidad",
     # Regulation / planning
-    "ley de vivienda", "regulación", "regulacion", "topes", "índice", "indice",
-    "licencia", "licencias", "planeamiento", "urbanismo", "suelo", "calificación", "calificacion",
-    "fiscalidad", "impuestos", "boe", "subasta", "subastas",
+    "ley de vivienda", "regulación", "regulacion", "topes", "licencia", "licencias",
+    "planeamiento", "urbanismo", "suelo", "fiscalidad", "impuestos", "boe", "subasta", "subastas",
+    # Construction
+    "construcción", "construccion", "arquitect", "cscae", "observatorio 2030",
     # Investment
     "fondo", "fondos", "socimi", "cartera", "yield", "cap rate", "rentabilidad",
-    "inversión", "inversion", "private equity", "inmobiliario",
+    "inversión", "inversion", "inversiones inmobiliarias",
 ]
 
 # Optional: category hints to strengthen classification (use in classifier).

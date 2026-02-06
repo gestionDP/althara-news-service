@@ -34,7 +34,7 @@ RSS_SOURCES = [
     {"name": "BOE General", "url": "https://www.boe.es/diario_boe/xml.php?id=BOE-S", "default_category": AltharaCategoryV2.REGULACION_VIVIENDA, "source": "BOE"},
     {"name": "Observatorio Inmobiliario", "url": "https://www.observatorioinmobiliario.es/rss/", "default_category": AltharaCategoryV2.SECTOR_INMOBILIARIO, "source": "Observatorio Inmobiliario"},
     {"name": "Interempresas Construcción", "url": "https://www.interempresas.net/construccion/RSS/", "default_category": AltharaCategoryV2.CONSTRUCCION_Y_COSTES, "source": "Interempresas"},
-    {"name": "Última Hora", "url": "https://www.ultimahora.es/feed.rss", "default_category": AltharaCategoryV2.SECTOR_INMOBILIARIO, "source": "Última Hora"},
+    # Última Hora removed: general newspaper (bikes, crime, etc.) - not sector-specific
 ]
 
 
@@ -56,11 +56,13 @@ async def _extract_article_content(url: str) -> Optional[str]:
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             })
             response.raise_for_status()
-            
-            if response.encoding:
-                response.encoding = 'utf-8'
-            
-            soup = BeautifulSoup(response.text, 'html.parser', from_encoding='utf-8')
+            # Decode as UTF-8; if server declares wrong charset, try latin-1 then fix with strip_html_tags/ftfy
+            raw = response.content
+            try:
+                html_text = raw.decode("utf-8")
+            except UnicodeDecodeError:
+                html_text = raw.decode("latin-1", errors="replace")
+            soup = BeautifulSoup(html_text, 'html.parser')
             
             for element in soup(["script", "style", "nav", "header", "footer", "aside", "iframe", "noscript"]):
                 element.decompose()

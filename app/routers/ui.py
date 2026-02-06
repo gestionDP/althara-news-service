@@ -19,10 +19,12 @@ from app.brands import BRANDS, get_domain_for_brand, get_display_name
 from app.constants import VALID_CATEGORIES
 from app.constants_tech import TECH_CATEGORY_LABELS, TechNewsCategory
 from app.auth import basic_auth_dependency
+from app.utils.html_utils import format_paragraphs
 
 router = APIRouter(tags=["ui"])
 templates_dir = Path(__file__).parent.parent / "templates"
 templates = Jinja2Templates(directory=str(templates_dir))
+templates.env.filters["format_paragraphs"] = format_paragraphs
 
 
 def _ensure_templates():

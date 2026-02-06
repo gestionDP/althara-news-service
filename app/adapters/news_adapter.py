@@ -1268,7 +1268,7 @@ def _build_disclaimer(source: Optional[str], url: Optional[str]) -> str:
     Construye disclaimer de atribución (en inglés).
     """
     source_name = source or "the original source"
-    url_text = f" Read the original article here: {url}." if url else ""
+    url_text = f" Read the original article here: {url} ." if url else ""
     
     return (
         f"Restructured by Althara from information published in {source_name}, "
