@@ -7,8 +7,9 @@ analytical and professional style for social media use.
 from __future__ import annotations
 
 import re
-import html
 from datetime import datetime
+
+from app.utils.html_utils import strip_html_tags
 from textwrap import shorten
 from typing import Optional, List, Dict, Any
 
@@ -22,38 +23,12 @@ ALTHARA_CLOSERS = [
 
 def _clean_html(text: str) -> str:
     """
-    Cleans HTML from text, extracting only pure text content.
-    Also removes metadata like authors, dates, share buttons, etc.
-    Handles UTF-8 encoding and HTML entities correctly.
-    
-    Args:
-        text: Text that may contain HTML
-        
-    Returns:
-        Clean text without HTML tags or entities, with correct encoding
+    Clean HTML from text for Althara content adaptation.
+    Uses base tag stripping, then removes metadata and applies accent fixes.
     """
+    text = strip_html_tags(text)
     if not text:
         return ""
-    
-    if isinstance(text, bytes):
-        try:
-            text = text.decode('utf-8')
-        except UnicodeDecodeError:
-            try:
-                text = text.decode('latin-1')
-            except UnicodeDecodeError:
-                text = text.decode('utf-8', errors='replace')
-    
-    text = html.unescape(text)
-    
-    text = text.replace('&amp;', '&')
-    text = text.replace('&lt;', '<')
-    text = text.replace('&gt;', '>')
-    text = text.replace('&quot;', '"')
-    text = text.replace('&#39;', "'")
-    text = text.replace('&nbsp;', ' ')
-    
-    text = re.sub(r'<[^>]+>', '', text)
     
     patterns_to_remove = [
         r'[A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ\s]+\s+\d{1,2}\s+[A-Z]{3}\.\s+\d{4}\s*-\s*\d{2}:\d{2}',
@@ -157,32 +132,32 @@ def _build_strategic_line(category: Optional[str]) -> str:
             "Detrás de la cifra, el patrón es un ajuste entre oferta limitada y demanda que aún no ha reprecificado del todo el riesgo del ciclo."
         )
     
-    if cat in {"FONDOS_INVERSION_INMOBILIARIA", "MOVIMIENTOS_GRANDES_TENEDORES", "GRANDES_INVERSIONES_INMOBILIARIAS"}:
+    if cat in {"FONDOS_INVERSION_INMOBILIARIA", "MOVIMIENTOS_GRANDES_TENEDORES", "GRANDES_INVERSIONES_INMOBILIARIAS", "INVERSION_INSTITUCIONAL", "OPERACIONES_CORPORATIVAS", "GRANDES_TENEDORES"}:
         return (
             "El movimiento no es aislado: refleja una rotación silenciosa de capital hacia activos donde la asimetría de información sigue siendo aprovechable."
         )
     
-    if cat in {"NOTICIAS_HIPOTECAS"}:
+    if cat in {"NOTICIAS_HIPOTECAS", "HIPOTECAS_Y_CREDITO", "TIPOS_Y_MACRO"}:
         return (
             "El repliegue y la reconfiguración del crédito redefinen quién puede seguir operando con ventaja en el próximo tramo del ciclo."
         )
     
-    if cat in {"NOTICIAS_BOE_SUBASTAS", "NOTICIAS_DESAHUCIOS"}:
+    if cat in {"NOTICIAS_BOE_SUBASTAS", "NOTICIAS_DESAHUCIOS", "BOE_SUBASTAS", "DESAHUCIOS_Y_VULNERABILIDAD"}:
         return (
             "Estas entradas formalizan stock, pero sobre todo dibujan el mapa de activos donde el mercado aún no ha fijado un precio de consenso."
         )
     
-    if cat in {"NOTICIAS_LEYES_OKUPAS", "NORMATIVAS_VIVIENDAS", "FALTA_VIVIENDA"}:
+    if cat in {"NOTICIAS_LEYES_OKUPAS", "NORMATIVAS_VIVIENDAS", "FALTA_VIVIENDA", "REGULACION_VIVIENDA", "OKUPACION_Y_SEGURIDAD_JURIDICA", "URBANISMO_Y_PLANEAMIENTO", "OFERTA_Y_STOCK"}:
         return (
             "La regulación no solo corrige desequilibrios aparentes, sino que reordena qué actores conservan acceso operativo real al mercado."
         )
     
-    if cat in {"NOTICIAS_CONSTRUCCION", "PRECIOS_MATERIALES", "PRECIOS_SUELO", "NOVEDADES_CONSTRUCCION"}:
+    if cat in {"NOTICIAS_CONSTRUCCION", "PRECIOS_MATERIALES", "PRECIOS_SUELO", "NOVEDADES_CONSTRUCCION", "CONSTRUCCION_Y_COSTES"}:
         return (
             "Los costes y las reglas del juego de la obra redefinen la frontera entre proyectos viables y meros ejercicios teóricos de rentabilidad."
         )
     
-    if cat in {"CONSTRUCCION_MODULAR", "NOTICIAS_URBANIZACION"}:
+    if cat in {"CONSTRUCCION_MODULAR", "NOTICIAS_URBANIZACION", "INDUSTRIALIZACION_MODULAR"}:
         return (
             "La industrialización y el planeamiento no solo cambian formas, comprimen plazos y riesgos allí donde el capital esté dispuesto a anticiparse."
         )
@@ -192,7 +167,7 @@ def _build_strategic_line(category: Optional[str]) -> str:
             "Más que un dato aislado, es una línea más en el gráfico de tensiones acumuladas que el consenso aún no ha terminado de asumir."
         )
     
-    if cat in {"NOTICIAS_INMOBILIARIAS"}:
+    if cat in {"NOTICIAS_INMOBILIARIAS", "SECTOR_INMOBILIARIO", "MERCADO_COMPRAVENTA", "ALQUILER_RESIDENCIAL", "ALQUILER_VACACIONAL"}:
         return (
             "No es una noticia suelta: es otra pieza en la secuencia que reordena precios, actores y acceso efectivo a oportunidades reales."
         )

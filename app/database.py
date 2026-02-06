@@ -64,10 +64,14 @@ if DATABASE_URL and DATABASE_URL.startswith("postgresql"):
             f"Correct format: postgresql+asyncpg://user:password@host/database"
         )
     
+    _echo = os.getenv("SQL_ECHO", "false").lower() in ("1", "true", "yes")
     engine = create_async_engine(
         DATABASE_URL,
-        echo=True,
-        future=True
+        echo=_echo,
+        future=True,
+        pool_pre_ping=True,
+        pool_size=5,
+        max_overflow=10,
     )
     
     AsyncSessionLocal = async_sessionmaker(

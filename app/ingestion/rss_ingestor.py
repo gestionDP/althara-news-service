@@ -11,284 +11,33 @@ import httpx
 from bs4 import BeautifulSoup
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from datetime import datetime, timezone
 from typing import Dict, Optional
 from app.models.news import News
-from app.constants import NewsCategory
+from app.utils.html_utils import strip_html_tags
+from app.utils.rss_utils import parse_published_date
+from app.utils.guardrails import passes_guardrails
+from app.constants import (
+    AltharaCategoryV2,
+    DENY_KEYWORDS,
+    ALLOW_KEYWORDS,
+    STRICT_REQUIRE_ALLOW,
+    CATEGORY_HINTS,
+)
 
 
 RSS_SOURCES = [
-    {
-        "name": "Expansion Inmobiliario",
-        "url": "https://e00-expansion.uecdn.es/rss/inmobiliario.xml",
-        "default_category": NewsCategory.NOTICIAS_INMOBILIARIAS,
-        "source": "Expansion",
-        "description": "Noticias de mercado, hipotecas, inversión, big deals"
-    },
-    {
-        "name": "Cinco Días - Economía Inmobiliaria",
-        "url": "https://cincodias.elpais.com/rss/act/economia_inmobiliaria/",
-        "default_category": NewsCategory.NOTICIAS_INMOBILIARIAS,
-        "source": "Cinco Días",
-        "description": "Noticias de economía inmobiliaria"
-    },
-    {
-        "name": "El Economista - Vivienda",
-        "url": "https://www.eleconomista.es/rss/rss-vivienda.php",
-        "default_category": NewsCategory.PRECIOS_VIVIENDA,
-        "source": "El Economista",
-        "description": "Noticias sobre vivienda y mercado inmobiliario"
-    },
-    {
-        "name": "Idealista News",
-        "url": "https://www.idealista.com/news/rss/v2/latest-news.xml",
-        "default_category": NewsCategory.NOTICIAS_INMOBILIARIAS,
-        "source": "Idealista",
-        "description": "Noticias inmobiliarias generales: mercado, precios, hipotecas, normativa"
-    },
-    
-    {
-        "name": "BOE Subastas",
-        "url": "https://subastas.boe.es/rss.php",
-        "default_category": NewsCategory.NOTICIAS_BOE_SUBASTAS,
-        "source": "BOE",
-        "description": "Subastas inmobiliarias del BOE"
-    },
-    {
-        "name": "BOE General",
-        "url": "https://www.boe.es/diario_boe/xml.php?id=BOE-S",
-        "default_category": NewsCategory.NORMATIVAS_VIVIENDAS,
-        "source": "BOE",
-        "description": "Leyes y normativas (puede incluir temas de vivienda)"
-    },
-    
-    {
-        "name": "Observatorio Inmobiliario",
-        "url": "https://www.observatorioinmobiliario.es/rss/",
-        "default_category": NewsCategory.NOTICIAS_INMOBILIARIAS,
-        "source": "Observatorio Inmobiliario",
-        "description": "Análisis y noticias del sector inmobiliario"
-    },
-    
-    {
-        "name": "Interempresas Construcción",
-        "url": "https://www.interempresas.net/construccion/RSS/",
-        "default_category": NewsCategory.NOTICIAS_CONSTRUCCION,
-        "source": "Interempresas",
-        "description": "Noticias sobre construcción"
-    },
-    
-    {
-        "name": "Última Hora",
-        "url": "https://www.ultimahora.es/feed.rss",
-        "default_category": NewsCategory.NOTICIAS_INMOBILIARIAS,
-        "source": "Última Hora",
-        "description": "Noticias locales de Baleares: alquiler, vivienda, mercado inmobiliario"
-    },
+    {"name": "Expansion Inmobiliario", "url": "https://e00-expansion.uecdn.es/rss/inmobiliario.xml", "default_category": AltharaCategoryV2.SECTOR_INMOBILIARIO, "source": "Expansion"},
+    {"name": "Cinco Días - Economía Inmobiliaria", "url": "https://cincodias.elpais.com/rss/act/economia_inmobiliaria/", "default_category": AltharaCategoryV2.SECTOR_INMOBILIARIO, "source": "Cinco Días"},
+    {"name": "El Economista - Vivienda", "url": "https://www.eleconomista.es/rss/rss-vivienda.php", "default_category": AltharaCategoryV2.PRECIOS_VIVIENDA, "source": "El Economista"},
+    {"name": "Idealista News", "url": "https://www.idealista.com/news/rss/v2/latest-news.xml", "default_category": AltharaCategoryV2.SECTOR_INMOBILIARIO, "source": "Idealista"},
+    {"name": "BOE Subastas", "url": "https://subastas.boe.es/rss.php", "default_category": AltharaCategoryV2.BOE_SUBASTAS, "source": "BOE"},
+    {"name": "BOE General", "url": "https://www.boe.es/diario_boe/xml.php?id=BOE-S", "default_category": AltharaCategoryV2.REGULACION_VIVIENDA, "source": "BOE"},
+    {"name": "Observatorio Inmobiliario", "url": "https://www.observatorioinmobiliario.es/rss/", "default_category": AltharaCategoryV2.SECTOR_INMOBILIARIO, "source": "Observatorio Inmobiliario"},
+    {"name": "Interempresas Construcción", "url": "https://www.interempresas.net/construccion/RSS/", "default_category": AltharaCategoryV2.CONSTRUCCION_Y_COSTES, "source": "Interempresas"},
+    {"name": "Última Hora", "url": "https://www.ultimahora.es/feed.rss", "default_category": AltharaCategoryV2.SECTOR_INMOBILIARIO, "source": "Última Hora"},
 ]
 
 
-def _clean_html(text: str) -> str:
-    """
-    Cleans HTML from text, extracting only pure text content.
-    
-    Args:
-        text: Text that may contain HTML
-        
-    Returns:
-        Clean text without HTML tags or entities
-    """
-    if not text:
-        return ""
-    
-    text = html.unescape(text)
-    text = re.sub(r'<[^>]+>', '', text)
-    text = re.sub(r'\s+', ' ', text)
-    text = text.strip()
-    
-    return text
-
-
-def _is_relevant_to_real_estate(title: str, summary: str = None) -> bool:
-    """
-    Filters news to keep only those relevant to the real estate sector.
-    Uses strict filtering: requires specific real estate keywords, not generic terms.
-    
-    Args:
-        title: News title
-        summary: News summary (optional)
-        
-    Returns:
-        True if the news is relevant to the real estate sector, False otherwise
-    """
-    if not title:
-        return False
-    
-    text_to_check = title.lower()
-    if summary:
-        text_to_check += " " + summary.lower()
-    
-    # STRICT: Only phrases that clearly indicate real estate context
-    # These are high-confidence indicators
-    strong_real_estate_phrases = [
-        'vivienda', 'viviendas', 
-        'inmobiliario', 'inmobiliaria', 'inmobiliarias',
-        'mercado inmobiliario', 'sector inmobiliario',
-        'mercado residencial', 'mercados residenciales',
-        'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria',
-        'alquiler', 'alquileres', 'renta', 'rentas',
-        'precio vivienda', 'precios vivienda', 'precio de vivienda', 'precios de vivienda',
-        'precio inmobiliario', 'precios inmobiliarios',
-        'valor inmobiliario', 'valores inmobiliarios',
-        'propiedad', 'propiedades', 'inmueble', 'inmuebles',
-        'compraventa', 'compraventas', 'compra vivienda', 'venta vivienda',
-        'subasta inmobiliaria', 'subastas inmobiliarias',
-        'desahucio', 'desahucios',
-        'okupa', 'okupas', 'okupación', 'okupaciones',
-        'ley vivienda', 'regulación vivienda', 'normativa vivienda',
-        'fondo inversión inmobiliaria', 'fondos inversión inmobiliaria',
-        'socimi', 'socimis', 'reit', 'reits',
-        'burbuja inmobiliaria', 'crisis vivienda',
-        'vpo', 'vivienda protegida', 'vivienda social',
-        'alquiler vacacional', 'airbnb', 'vivienda turística',
-        'real estate', 'housing market', 'property market',
-        'mortgage', 'mortgages',
-        'residencial', 'residenciales',  # Agregado para capturar "mercados residenciales"
-    ]
-    
-    # Medium confidence: construction/development but must be in real estate context
-    # These need to appear WITH other real estate terms
-    medium_keywords = [
-        'construcción', 'construcciones', 'obra', 'obras',
-        'promoción inmobiliaria', 'promociones inmobiliarias', 
-        'desarrollo inmobiliario', 'desarrollos inmobiliarios',
-        'urbanismo', 'urbanización', 'urbanizaciones',
-        'suelo', 'terreno', 'solar', 'urbanizable',
-        'reforma vivienda', 'reformas vivienda', 'rehabilitación vivienda',
-        'licencia construcción', 'permiso construcción',
-        'construction', 'building', 'development',
-    ]
-    
-    # STRICT EXCLUSIONS: Topics that are NEVER relevant to real estate
-    strong_exclusions = [
-        # Tourism (not real estate related)
-        'países más visitados', 'países visitados', 'turismo', 'viajeros', 
-        'destinos turísticos', 'visitantes', 'turistas', 'atracciones turísticas',
-        
-        # Architecture awards/premiums (not market news)
-        'premio', 'premios', 'galardón', 'galardones', 'award', 'awards',
-        'gana premio', 'ganan premio', 'premio de', 'premios de',
-        'architecture awards', 'premios cerámica', 'premios internacionales',
-        'excelencia', 'galardones en arquitectura',
-        'obras más destacadas', 'recorrido por', 'estudio de arquitectura',
-        'doctor arquitecto', 'máster en arquitectura',
-        
-        # Events/exhibitions (not market news)
-        'feria', 'ferias', 'exposición', 'exposiciones', 'congreso',
-        'big 5 global', 'participa en', 'participa exitosamente',
-        'convocan', 'se convocan', 'convocatoria',
-        
-        # Non-real-estate industries
-        'calzado', 'zapatos', 'panter', 'marca made in spain',
-        'logístico', 'logística', 'macrocentro logístico', 'centro logístico',
-        'almacén', 'almacenes', 'distribución logística',
-        
-        # Technical construction (not market news)
-        'teja cerámica', 'cubiertas microventiladas', 'materiales nobles',
-        'fachada viva', 'impresión 3d', 'impresa en 3d',
-        'diseñar con sombra', 'arquitectura bioclimática', 'arquitectura sostenible',
-        'transformación digital', 'building smart', 'tecniberia',
-        'formación avanzada', 'gestión comercial', 'distribución profesional',
-        
-        # Accidents/crimes (not market news)
-        'herido', 'heridos', 'accidente', 'accidentes', 'volcar', 'volcó',
-        'atropello', 'atropellado', 'choque', 'colisión',
-        'muerto', 'muertos', 'fallecido', 'fallecidos',
-        'detenido', 'detenidos', 'arresto', 'arrestos',
-        'robo', 'robos', 'hurto', 'hurtos',
-        
-        # Entertainment/culture (not market news)
-        'película', 'películas', 'cine', 'actor', 'actriz',
-        'música', 'concierto', 'conciertos', 'festival',
-        'libro', 'libros', 'escritor', 'escritora',
-        'museo', 'museos',
-        
-        # Sports (not market news)
-        'fútbol', 'futbol', 'partido', 'partidos', 'gol', 'goles',
-        'equipo', 'equipos', 'jugador', 'jugadores',
-        'baloncesto', 'tenis', 'deporte', 'deportes',
-        
-        # Politics (unless specifically about housing laws)
-        'elecciones', 'votación', 'votaciones', 'partido político',
-        
-        # Weather/natural disasters (not market news)
-        'incendio', 'incendios', 'inundación', 'inundaciones',
-        'temporal', 'temporales', 'lluvia', 'lluvias',
-        
-        # Health/education (not market news)
-        'hospital', 'hospitales', 'médico', 'médicos', 'enfermedad',
-        'colegio', 'colegios', 'universidad', 'universidades', 'estudiante',
-        
-        # Transportation (not market news)
-        'tráfico', 'trafico', 'carretera', 'carreteras', 'autopista',
-        'camión', 'camiones', 'coche', 'coches', 'vehículo', 'vehículos',
-        'mercedes', 'bmw', 'audi', 'ford', 'renault', 'seat', 'volvo',
-        'cabrio', 'todoterreno', 'automóvil', 'automóviles', 'auto',
-        
-        # Vandalism/culture (not market news)
-        'pintadas', 'grafiti', 'vandalismo',
-        'homenaje', 'homenajes', 'acto', 'actos culturales',
-        
-        # Technology (not market news)
-        'smartphone', 'tablet', 'iphone', 'android', 'app', 'aplicación',
-        
-        # Opinion/history/philosophy (not market news)
-        'dignidad', 'chándal', 'carlos i', 'carlos i de inglaterra',
-        'rey', 'reina', 'monarca', 'monarquía',
-        'historia', 'histórico', 'histórica',
-        'filosofía', 'filosófico', 'filosófica',
-        'opinión', 'editorial', 'tribuna', 'columna',
-        'ensayo', 'reflexión', 'reflexiones',
-    ]
-    
-    # Check strong exclusions first (always exclude)
-    for keyword in strong_exclusions:
-        if keyword in text_to_check:
-            return False
-    
-    # Check for strong real estate phrases (high confidence)
-    has_strong_keyword = False
-    for phrase in strong_real_estate_phrases:
-        if phrase in text_to_check:
-            has_strong_keyword = True
-            break
-    
-    # If we have a strong keyword, it's relevant
-    if has_strong_keyword:
-        return True
-    
-    # If no strong keyword, check if we have medium keywords
-    # BUT only if they appear with context that suggests real estate
-    has_medium_keyword = False
-    for keyword in medium_keywords:
-        if keyword in text_to_check:
-            has_medium_keyword = True
-            break
-    
-    # Medium keywords alone are NOT enough - they need real estate context
-    # Check if text also contains any real estate indicator
-    if has_medium_keyword:
-        # Look for any additional real estate context
-        real_estate_context = [
-            'vivienda', 'inmobiliario', 'inmobiliaria', 'propiedad', 
-            'inmueble', 'residencial', 'comercial', 'oficina', 'local'
-        ]
-        for context_word in real_estate_context:
-            if context_word in text_to_check:
-                return True
-    
-    # If we get here, it's not relevant
-    return False
 
 
 async def _extract_article_content(url: str) -> Optional[str]:
@@ -358,200 +107,17 @@ async def _extract_article_content(url: str) -> Optional[str]:
         return None
 
 
-def _categorize_by_keywords(title: str, summary: Optional[str] = None) -> Optional[str]:
-    """
-    Categorizes news based on keywords from title and summary.
-    Uses specific phrases first, then falls back to general terms.
-    
-    Args:
-        title: News title
-        summary: News summary (optional)
-        
-    Returns:
-        Detected category or NOTICIAS_INMOBILIARIAS as default
-    """
-    from app.constants import NewsCategory
-    
-    text_to_analyze = title.lower()
-    if summary:
-        text_to_analyze += " " + summary.lower()
-    
-    # Priority order: specific phrases first, then single words
-    # Categories are ordered by specificity (most specific first)
-    keyword_mapping = {
-        # Very specific categories first
-        NewsCategory.FONDOS_INVERSION_INMOBILIARIA: [
-            # Multi-word phrases (highest priority)
-            'fondo de inversión inmobiliaria', 'fondos de inversión inmobiliaria',
-            'fondo inmobiliario', 'fondos inmobiliarios',
-            'gestión de activos inmobiliarios', 'vehículo de inversión inmobiliaria',
-            'patrimonio inmobiliario', 'grupo inmobiliario',
-            'socimi', 'socimis', 'reit', 'reits',
-            # Company names (specific to this category)
-            'mazabi', 'merlin', 'colonial', 'metrovacesa', 'neinor', 'azora', 'hines', 'silicius',
-            # Single words (lower priority)
-            'fondo cerrado', 'fondo abierto', 'gestión patrimonial',
-        ],
-        NewsCategory.GRANDES_INVERSIONES_INMOBILIARIAS: [
-            'gran inversión inmobiliaria', 'grandes inversiones inmobiliarias',
-            'inversión millonaria inmobiliaria', 'millones de inversión inmobiliaria',
-            'mega proyecto inmobiliario', 'macro proyecto inmobiliario',
-            'inversión masiva inmobiliaria', 'operación inmobiliaria millonaria',
-            'transacción millonaria inmobiliaria', 'adquisición millonaria inmobiliaria',
-        ],
-        NewsCategory.MOVIMIENTOS_GRANDES_TENEDORES: [
-            'gran tenedor', 'grandes tenedores', 'inversor institucional inmobiliario',
-            'inversores institucionales inmobiliarios', 'fondo buitre', 'fondos buitre',
-            'hedge fund inmobiliario', 'private equity inmobiliario',
-            'operador inmobiliario', 'operadores inmobiliarios',
-            'rotación de activos inmobiliarios', 'desinversión inmobiliaria',
-        ],
-        NewsCategory.TOKENIZATION_ACTIVOS: [
-            'tokenización inmobiliaria', 'tokenizacion inmobiliaria',
-            'blockchain inmobiliario', 'criptoactivo inmobiliario',
-            'nft inmobiliario', 'activo tokenizado inmobiliario',
-        ],
-        
-        NewsCategory.NOTICIAS_HIPOTECAS: [
-            'hipoteca', 'hipotecas', 'hipotecario', 'hipotecaria',
-            'crédito hipotecario', 'euribor', 'tipo de interés hipotecario',
-            'tasa hipotecaria', 'préstamo hipotecario',
-            'subrogación hipotecaria', 'novación hipotecaria', 'cancelación hipoteca',
-        ],
-        NewsCategory.NOTICIAS_LEYES_OKUPAS: [
-            'okupa', 'okupas', 'okupación', 'okupaciones', 'ocupación ilegal',
-            'ley okupas', 'ley antiokupas', 'desalojo okupas', 'desalojos okupas',
-        ],
-        NewsCategory.NOTICIAS_BOE_SUBASTAS: [
-            'subasta inmobiliaria', 'subastas inmobiliarias',
-            'subasta judicial inmobiliaria', 'boe subasta',
-            'subasta pública inmobiliaria',
-        ],
-        NewsCategory.NOTICIAS_DESAHUCIOS: [
-            'desahucio', 'desahucios', 'lanzamiento inmobiliario',
-            'ejecución hipotecaria', 'embargo inmobiliario',
-            'expulsión vivienda', 'desalojo forzoso',
-        ],
-        NewsCategory.FALTA_VIVIENDA: [
-            'falta de vivienda', 'escasez de vivienda', 'déficit habitacional',
-            'crisis de vivienda', 'problema de vivienda', 'acceso a vivienda',
-            'vivienda asequible', 'vivienda social', 'vpo', 'vivienda protegida',
-        ],
-        
-        NewsCategory.PRECIOS_VIVIENDA: [
-            'precio de vivienda', 'precios de vivienda', 'precio vivienda', 'precios vivienda',
-            'precio por m²', 'precio por metro cuadrado', 'evolución precios vivienda',
-            'precio medio vivienda', 'coste vivienda', 'valor vivienda', 'revalorización vivienda',
-        ],
-        NewsCategory.PRECIOS_MATERIALES: [
-            'precio materiales construcción', 'precios materiales construcción',
-            'coste materiales construcción', 'costes materiales construcción',
-            'precio construcción', 'coste construcción',
-            'precio cemento', 'precio acero', 'precio ladrillo',
-        ],
-        NewsCategory.PRECIOS_SUELO: [
-            'precio suelo', 'precios suelo', 'precio del suelo', 'precios del suelo',
-            'valor suelo', 'coste suelo', 'suelo urbanizable',
-        ],
-        
-        NewsCategory.NOTICIAS_CONSTRUCCION: [
-            'promoción inmobiliaria', 'promociones inmobiliarias',
-            'desarrollo inmobiliario', 'obra nueva vivienda',
-            'vivienda nueva', 'nueva construcción vivienda',
-        ],
-        NewsCategory.NOTICIAS_URBANIZACION: [
-            'urbanización', 'urbanizaciones', 'urbanismo',
-            'plan general urbanístico', 'pgou', 'licencia urbanística',
-            'ordenación territorial',
-        ],
-        NewsCategory.NOVEDADES_CONSTRUCCION: [
-            'nueva construcción', 'nuevas construcciones', 'innovación construcción',
-            'tecnología construcción', 'tendencias construcción',
-        ],
-        NewsCategory.CONSTRUCCION_MODULAR: [
-            'construcción modular', 'vivienda modular', 'prefabricada',
-            'prefabricadas', 'construcción industrializada',
-        ],
-        
-        NewsCategory.ALQUILER_VACACIONAL: [
-            'alquiler vacacional', 'alquileres vacacionales', 'airbnb',
-            'turismo residencial', 'vivienda turística', 'apartamento turístico',
-        ],
-        NewsCategory.NORMATIVAS_VIVIENDAS: [
-            'ley vivienda', 'ley de vivienda', 'normativa vivienda',
-            'regulación vivienda', 'decreto vivienda', 'real decreto vivienda',
-            'legislación inmobiliaria', 'ley urbanística',
-        ],
-        
-        NewsCategory.FUTURO_SECTOR_INMOBILIARIO: [
-            'futuro sector inmobiliario', 'tendencias inmobiliarias',
-            'perspectivas sector inmobiliario', 'evolución sector inmobiliario',
-            'previsión sector inmobiliario', 'proyección sector inmobiliario',
-        ],
-        NewsCategory.BURBUJA_INMOBILIARIA: [
-            'burbuja inmobiliaria', 'sobrevaloración inmobiliaria',
-            'corrección mercado inmobiliario', 'ajuste precios vivienda',
-            'caída precios vivienda',
-        ],
-        
-        # General category (lowest priority, used as fallback)
-        NewsCategory.NOTICIAS_INMOBILIARIAS: [
-            'inmobiliario', 'inmobiliaria', 'inmobiliarias',
-            'vivienda', 'viviendas', 'propiedad', 'propiedades',
-            'inmueble', 'inmuebles', 'mercado inmobiliario',
-        ],
-    }
-    
-    # Separate specific categories from general
-    specific_categories = {k: v for k, v in keyword_mapping.items() 
-                          if k != NewsCategory.NOTICIAS_INMOBILIARIAS}
-    general_category = {NewsCategory.NOTICIAS_INMOBILIARIAS: keyword_mapping[NewsCategory.NOTICIAS_INMOBILIARIAS]}
-    
-    # First pass: check multi-word phrases (most specific)
-    for category, keywords in specific_categories.items():
-        for keyword in keywords:
-            if ' ' in keyword and keyword in text_to_analyze:
-                return category
-    
-    # Second pass: check single words in specific categories
-    for category, keywords in specific_categories.items():
-        for keyword in keywords:
-            if ' ' not in keyword and keyword in text_to_analyze:
-                return category
-    
-    # Third pass: check general category (fallback)
-    for category, keywords in general_category.items():
-        for keyword in keywords:
-            if keyword in text_to_analyze:
-                return category
-    
-    # Default fallback
-    return NewsCategory.NOTICIAS_INMOBILIARIAS
-
-
-def _parse_published_date(entry) -> datetime:
-    """
-    Attempts to parse the publication date of an RSS entry.
-    
-    Args:
-        entry: Feed entry parsed by feedparser
-        
-    Returns:
-        datetime in UTC, or current datetime if parsing fails
-    """
-    if hasattr(entry, 'published_parsed') and entry.published_parsed:
-        try:
-            return datetime(*entry.published_parsed[:6], tzinfo=timezone.utc)
-        except (TypeError, ValueError):
-            pass
-    
-    if hasattr(entry, 'updated_parsed') and entry.updated_parsed:
-        try:
-            return datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc)
-        except (TypeError, ValueError):
-            pass
-    
-    return datetime.now(timezone.utc)
+def _categorize_althara_v2(title: str, summary: Optional[str] = None) -> str:
+    """Clasifica con CATEGORY_HINTS de constants. Devuelve categoría v2."""
+    text = (title + " " + (summary or "")).lower()
+    best_cat = AltharaCategoryV2.SECTOR_INMOBILIARIO
+    best_score = 0
+    for category, keywords in CATEGORY_HINTS.items():
+        score = sum(1 for kw in keywords if kw in text)
+        if score > best_score:
+            best_score = score
+            best_cat = category
+    return best_cat
 
 
 async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 10) -> Dict[str, int]:
@@ -599,7 +165,7 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
             for entry in entries_to_process:
                 if relevant_count >= max_items_per_source:
                     break
-                title = getattr(entry, 'title', 'Sin título')
+                title = getattr(entry, "title", "Untitled")
                 link = getattr(entry, 'link', '')
                 
                 if not title or not link:
@@ -613,18 +179,18 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                 
                 # Clean HTML from temp_summary before filtering
                 if temp_summary:
-                    temp_summary_clean = _clean_html(temp_summary)
+                    temp_summary_clean = strip_html_tags(temp_summary)
                 else:
                     temp_summary_clean = None
                 
-                # First filter: be more permissive - only filter based on title
-                # We'll do a stricter filter after getting full content
-                # This prevents rejecting news due to HTML or irrelevant content in RSS summary
-                if not _is_relevant_to_real_estate(title, None):
+                if not passes_guardrails(
+                    title, DENY_KEYWORDS, ALLOW_KEYWORDS, STRICT_REQUIRE_ALLOW,
+                    summary=temp_summary_clean, url=link,
+                ):
                     continue
                 
                 relevant_count += 1
-                published_at = _parse_published_date(entry)
+                published_at = parse_published_date(entry)
                 full_content = None
                 
                 if hasattr(entry, 'content') and entry.content:
@@ -642,7 +208,7 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                 raw_summary = None
                 
                 if full_content:
-                    raw_summary = _clean_html(full_content)
+                    raw_summary = strip_html_tags(full_content)
                     if len(raw_summary) < 200:
                         raw_summary = None
                 
@@ -652,13 +218,15 @@ async def ingest_rss_sources(session: AsyncSession, max_items_per_source: int = 
                         raw_summary = scraped_content
                 
                 if not raw_summary and temp_summary:
-                    raw_summary = _clean_html(temp_summary)
+                    raw_summary = strip_html_tags(temp_summary)
                 
-                if not _is_relevant_to_real_estate(title, raw_summary):
+                if not passes_guardrails(
+                    title, DENY_KEYWORDS, ALLOW_KEYWORDS, STRICT_REQUIRE_ALLOW,
+                    summary=raw_summary, url=link,
+                ):
                     continue
-                
-                detected_category = _categorize_by_keywords(title, raw_summary)
-                final_category = detected_category if detected_category else default_category
+
+                final_category = _categorize_althara_v2(title, raw_summary) or default_category
                 
                 stmt = select(News).where(News.url == link)
                 result = await session.execute(stmt)

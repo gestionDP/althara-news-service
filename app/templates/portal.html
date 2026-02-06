@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+{% block title %}News Studio - {{ brand_display }}{% endblock %}
+{% block body %}
+<div class="portal theme-{{ brand }}">
+  <header class="portal-header">
+    <div class="container">
+      <div class="header-row">
+        <div class="header-left">
+          <div class="brand-switch">
+            <select id="brandSelect" onchange="switchBrand(this.value)">
+              {% for key, config in brands.items() %}
+              <option value="{{ key }}" {% if key == brand %}selected{% endif %}>{{ config.display }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <form class="search-wrap" method="get" action="/ui/{{ brand }}" id="searchForm">
+            <input type="hidden" name="tab" value="{{ tab }}">
+            <input type="hidden" name="category" value="{{ category_filter }}">
+            <input type="hidden" name="only_without_draft" value="{{ '1' if only_without_draft else '' }}">
+            <input type="text" name="q" placeholder="Buscar…" value="{{ q }}" onchange="this.form.submit()">
+          </form>
+        </div>
+        <div class="header-right">
+          <div class="filter-wrap" style="position:relative">
+            <button type="button" class="btn-filter" onclick="toggleFilter()" title="Filtrar por categoría o sin borrador">Filtrar</button>
+            <div class="filter-drawer hidden" id="filterDrawer">
+              <form method="get" action="/ui/{{ brand }}">
+                <input type="hidden" name="tab" value="{{ tab }}">
+                <input type="hidden" name="q" value="{{ q }}">
+                <div class="filter-row">
+                  <label>Categoría</label>
+                  <select name="category">
+                    <option value="">Todas</option>
+                    {% for c in categories %}
+                    <option value="{{ c.value }}" {% if category_filter == c.value %}selected{% endif %}>{{ c.label }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="filter-row toggle-row">
+                  <input type="checkbox" name="only_without_draft" id="onlyNoDraft" value="1" {% if only_without_draft %}checked{% endif %}>
+                  <label for="onlyNoDraft" style="margin:0">Solo sin borrador</label>
+                </div>
+                <button type="submit" class="btn btn-apply">Aplicar</button>
+              </form>
+            </div>
+          </div>
+          <button class="btn-generate-more" id="btnGenerate" onclick="openGenerateModal()" title="Ingestar noticias RSS y generar borradores">Generar más noticias</button>
+        </div>
+      </div>
+      <div class="subheader">
+        <nav class="tabs">
+          <a href="/ui/{{ brand }}?tab=inbox{% if q %}&q={{ q }}{% endif %}{% if category_filter %}&category={{ category_filter }}{% endif %}{% if only_without_draft %}&only_without_draft=1{% endif %}" class="tab {% if tab == 'inbox' %}active{% endif %}">Bandeja</a>
+          <a href="/ui/{{ brand }}?tab=drafts{% if q %}&q={{ q }}{% endif %}" class="tab {% if tab == 'drafts' %}active{% endif %}">Borradores</a>
+          <a href="/ui/{{ brand }}?tab=approved{% if q %}&q={{ q }}{% endif %}" class="tab {% if tab == 'approved' %}active{% endif %}">Aprobados</a>
+        </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="portal-main">
+    <div class="container">
+      <div id="toast" class="toast hidden"></div>
+      <ul class="news-list">
+        {% for item in news_with_drafts %}
+        <li class="news-row">
+          <a href="/ui/{{ brand }}/news/{{ item.news.id }}" class="row-main">
+            <div class="meta-line">
+              {% if item.news.relevance_score %}<span>{{ item.news.relevance_score }}</span>{% endif %}
+              <span class="badge badge-cat">{{ item.news.category[:12] }}{% if item.news.category|length > 12 %}…{% endif %}</span>
+              <span>{{ item.news.source }}</span>
+              <span class="date-relative" title="{{ item.news.published_at.strftime('%Y-%m-%d %H:%M') if item.news.published_at else '' }}">{{ item.news.published_at.strftime('%Y-%m-%d') if item.news.published_at else '' }}</span>
+            </div>
+            <h3>{{ item.news.title }}</h3>
+          </a>
+          <div class="row-actions">
+            {% if item.draft_count > 0 %}
+            <a href="/ui/{{ brand }}/draft/{{ item.first_draft_id }}" class="btn-primary" title="Abrir último borrador para editar">Editar IG</a>
+            <a href="/ui/{{ brand }}/news/{{ item.news.id }}" class="btn-secondary" title="Ver noticia y borradores (variantes)">Ver</a>
+            {% else %}
+            <button type="button" class="btn-primary btn-generate-ig" data-news-id="{{ item.news.id }}" title="Crear primer borrador IG para esta noticia">Crear IG</button>
+            {% endif %}
+            <a href="{{ item.news.url }}" target="_blank" rel="noopener" class="btn-ghost-sm" title="Abrir noticia original en nueva pestaña">Fuente ↗</a>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if not news_with_drafts %}
+      <p class="empty">No hay noticias. Usa "Generar más noticias" para ingestar.</p>
+      {% endif %}
+    </div>
+  </main>
+</div>
+
+<div class="modal-overlay hidden" id="generateModal">
+  <div class="modal">
+    <h3>Generar más noticias</h3>
+    <p>Se ingestarán fuentes RSS (máx. 5 por fuente). Se generará <strong>1 borrador por noticia nueva</strong>. ¿Continuar?</p>
+    <div class="modal-actions">
+      <button type="button" class="btn" onclick="closeGenerateModal()">Cancelar</button>
+      <button type="button" class="btn-generate-more" onclick="confirmGenerate()">Continuar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const brand = "{{ brand }}";
+const tab = "{{ tab }}";
+
+function switchBrand(b) { location.href = `/ui/${b}?tab=${tab}`; }
+function toggleFilter() { document.getElementById('filterDrawer').classList.toggle('hidden'); }
+
+function openGenerateModal() { document.getElementById('generateModal').classList.remove('hidden'); }
+function closeGenerateModal() { document.getElementById('generateModal').classList.add('hidden'); }
+
+async function confirmGenerate() {
+  const btn = document.getElementById('btnGenerate');
+  btn.classList.add('loading');
+  btn.textContent = 'Ingestando…';
+  closeGenerateModal();
+  const url = brand === 'oxono' ? '/api/tech/admin/ingest-and-generate' : '/api/admin/ingest-and-adapt?generate_ig=true';
+  const r = await fetch(url, { method: 'POST' });
+  const d = await r.json();
+  btn.classList.remove('loading');
+  btn.textContent = 'Generar más noticias';
+  showToast(r.ok ? `Ingestadas: ${d.ingested || 0} · Borradores: ${d.drafts_generated || 0}` : 'Error: ' + (d.detail || 'Unknown'), r.ok ? 'success' : 'error');
+  if (r.ok) setTimeout(() => location.reload(), 1500);
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast ' + (type || '');
+  t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 4000);
+}
+
+document.querySelectorAll('.btn-generate-ig').forEach(btn => {
+  btn.onclick = async (e) => { e.preventDefault(); e.stopPropagation();
+    const id = btn.dataset.newsId;
+    const r = await fetch(`/api/ig/news/${id}/generate`, { method: 'POST' });
+    const d = await r.json();
+    if (r.ok) location.href = `/ui/${brand}/draft/${d.id}`;
+    else showToast('Error: ' + (d.detail || 'Unknown'), 'error');
+  };
+});
+</script>
+{% endblock %}

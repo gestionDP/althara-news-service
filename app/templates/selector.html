@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}News Studio - Elegir marca{% endblock %}
+{% block body %}
+<div class="selector-container">
+  <h1>News Studio</h1>
+  <p class="subtitle">Selecciona una marca para gestionar noticias</p>
+  <div class="brand-cards">
+    {% for key, config in brands.items() %}
+    <a href="/ui/{{ key }}" class="brand-card theme-{{ config.theme }}">
+      <span class="brand-name">{{ config.display }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

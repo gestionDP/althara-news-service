@@ -18,6 +18,23 @@ class Settings(BaseSettings):
     
     IDEALISTA_BASE_URL: Optional[str] = None
     IDEALISTA_PDF_BASE_URL: Optional[str] = None
+
+    # News Studio / UI
+    UI_USER: Optional[str] = None
+    UI_PASS: Optional[str] = None
+    INGEST_TOKEN: Optional[str] = None
+
+    # RSS ingestion limits per source
+    TECH_RSS_LIMIT_PER_SOURCE: int = 5
+    REAL_ESTATE_RSS_LIMIT_PER_SOURCE: int = 5
+
+    # IG generation
+    AUTO_GENERATE_IG_AFTER_INGEST: bool = True
+    IG_DEFAULT_TONE: str = "neutral"
+    IG_VARIANTS_COUNT: int = 3
+
+    # Studio default brand (optional)
+    STUDIO_BRAND_DEFAULT: Optional[str] = "althara"
     
     class Config:
         env_file = ".env"

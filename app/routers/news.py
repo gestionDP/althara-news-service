@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, func
+from sqlalchemy import select, and_, func, exists
 from sqlalchemy.exc import SQLAlchemyError
 from typing import Optional
 from datetime import datetime
@@ -9,8 +9,10 @@ import logging
 
 from app.database import get_db
 from app.models.news import News
+from app.models.ig_draft import IGDraft
 from app.schemas.news import NewsCreate, NewsRead, PaginatedResponse
-from app.ingestion.rss_ingestor import _is_relevant_to_real_estate
+from app.constants import DENY_KEYWORDS, ALLOW_KEYWORDS, STRICT_REQUIRE_ALLOW
+from app.utils.guardrails import passes_guardrails
 
 logger = logging.getLogger(__name__)
 
@@ -27,10 +29,13 @@ async def create_news(news_data: NewsCreate, db: AsyncSession = Depends(get_db))
     Validates that the news is relevant to the real estate sector before inserting.
     """
     # Validate relevance to real estate sector
-    if not _is_relevant_to_real_estate(news_data.title, news_data.raw_summary):
+    if not passes_guardrails(
+        news_data.title, DENY_KEYWORDS, ALLOW_KEYWORDS, STRICT_REQUIRE_ALLOW,
+        summary=news_data.raw_summary, url=getattr(news_data, "url", "") or "",
+    ):
         raise HTTPException(
             status_code=400,
-            detail="La noticia no es relevante para el sector inmobiliario. Solo se permiten noticias relacionadas con vivienda, inmobiliaria, hipotecas, alquiler, construcción inmobiliaria, etc."
+            detail="News is not relevant to the real estate sector. Only news related to housing, real estate, mortgages, rentals, construction, etc. are allowed."
         )
     
     new_news = News(**news_data.model_dump())
@@ -46,6 +51,9 @@ async def list_news(
     from_date: Optional[datetime] = Query(None, description="Date from (published_at >=)"),
     to_date: Optional[datetime] = Query(None, description="Date to (published_at <=)"),
     used_in_social: Optional[bool] = Query(None, description="Filter by used in social media (true/false)"),
+    domain: Optional[str] = Query(None, description="Filter by domain: tech | real_estate | all. Default: real_estate (backward compat Althara web)"),
+    only_with_draft: Optional[bool] = Query(None, description="Only news that have at least one IG draft"),
+    order_by: Optional[str] = Query("published_at", description="Order by: published_at | relevance_score"),
     limit: int = Query(50, ge=1, le=200, description="Maximum number of news items to return (1-200)"),
     offset: int = Query(0, ge=0, description="Number of news items to skip for pagination"),
     db: AsyncSession = Depends(get_db)
@@ -76,12 +84,25 @@ async def list_news(
         
         if used_in_social is not None:
             conditions.append(News.used_in_social == used_in_social)
-        
+
+        # domain: None → real_estate (backward compat for Althara web). "all" → no filter
+        if domain == "all":
+            pass
+        elif domain:
+            conditions.append(News.domain == domain)
+        else:
+            conditions.append(News.domain == "real_estate")
+
+        if only_with_draft:
+            has_draft = exists().where(IGDraft.news_id == News.id)
+            conditions.append(has_draft)
+
         if conditions:
             query = query.where(and_(*conditions))
             count_query = count_query.where(and_(*conditions))
-        
-        query = query.order_by(News.published_at.desc())
+
+        order_col = News.relevance_score.desc().nullslast() if order_by == "relevance_score" else News.published_at.desc()
+        query = query.order_by(order_col)
         query = query.limit(limit).offset(offset)
         
         result = await db.execute(query)

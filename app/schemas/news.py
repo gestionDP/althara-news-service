@@ -17,6 +17,8 @@ class NewsBase(BaseModel):
     used_in_social: bool = False
     provincia: Optional[str] = None
     poblacion: Optional[str] = None
+    domain: str = "real_estate"
+    relevance_score: Optional[int] = None
 
 class NewsCreate(NewsBase):
     """Schema for creating a news item. Excludes id, created_at, updated_at"""

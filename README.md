@@ -1,178 +1,208 @@
 # althara-news-service
 
-Microservicio de noticias inmobiliarias desarrollado con FastAPI, SQLAlchemy async y Alembic, conectado a Neon PostgreSQL.
+News microservice for Althara (real estate) and Oxono (tech/AI), with internal News Studio. Built with FastAPI, async SQLAlchemy and Alembic, connected to Neon PostgreSQL.
 
 ---
 
-## 📋 Índice
+## 📋 Table of Contents
 
-- [Resumen del Proyecto](#resumen-del-proyecto)
-- [Lo que se Completó](#lo-que-se-completó)
-- [Requisitos](#requisitos)
-- [Instalación y Configuración](#instalación-y-configuración)
-- [Estado Actual](#estado-actual)
-- [Documentación de la API](#documentación-de-la-api)
-- [Endpoints](#endpoints)
-- [Ingestión de Noticias](#ingestión-de-noticias)
-- [Adapter Althara](#adapter-althara)
-- [Categorías de Noticias](#categorías-de-noticias)
-- [Pruebas del Microservicio](#pruebas-del-microservicio)
-- [Estructura del Proyecto](#estructura-del-proyecto)
-- [Automatización](#automatización)
-- [Tecnologías](#tecnologías)
-- [Problemas Resueltos](#problemas-resueltos)
-- [Próximos Pasos](#próximos-pasos)
-- [Troubleshooting](#troubleshooting)
-
----
-
-## 📝 Resumen del Proyecto
-
-Este microservicio proporciona una API REST para gestionar noticias inmobiliarias. Permite crear, listar y consultar noticias con diferentes categorías predefinidas, conectándose a una base de datos PostgreSQL en Neon mediante SQLAlchemy async.
+- [Quick Start](#-quick-start)
+- [Project Summary](#-project-summary)
+- [What's Completed](#-whats-completed)
+- [Requirements](#️-requirements)
+- [Installation and Configuration](#-installation-and-configuration)
+- [Current Status](#-current-status)
+- [API Documentation](#-api-documentation)
+- [Endpoints](#-endpoints)
+- [News Ingestion](#-news-ingestion)
+- [Althara Adapter](#-althara-adapter)
+- [News Categories](#-news-categories)
+- [Testing](#-testing)
+- [Project Structure](#-project-structure)
+- [Automation](#-automation)
+- [Technologies](#️-technologies)
+- [Resolved Issues](#-resolved-issues)
+- [Next Steps](#-next-steps)
+- [Troubleshooting](#-troubleshooting)
+- [News Studio (UI)](#-news-studio-ui)
+- ["Generate more" Endpoints](#-generate-more-endpoints)
 
 ---
 
-## ✅ Lo que se Completó
+## 📝 Project Summary
 
-### BLOQUE 1: Configuración de Alembic (Migraciones Async) ✅
+This microservice provides a REST API to manage real estate news. It allows creating, listing and querying news with predefined categories, connecting to a PostgreSQL database on Neon via async SQLAlchemy.
 
-- ✅ `alembic.ini` configurado sin URL fija (usa variable de entorno)
-- ✅ `alembic/env.py` configurado para modo async con `async_engine_from_config`
-- ✅ Migración inicial creada: `001_initial_migration_create_news_table.py`
-- ✅ Normalización automática de URLs de base de datos
+---
 
-### BLOQUE 2: Modelo SQLAlchemy `News` ✅
+## ✅ What's Completed
 
-- ✅ Modelo `News` completo con todos los campos:
+### BLOCK 1: Alembic Configuration (Async Migrations) ✅
+
+- ✅ `alembic.ini` configured without hardcoded URL (uses env variable)
+- ✅ `alembic/env.py` configured for async mode with `async_engine_from_config`
+- ✅ Initial migration: `001_initial_migration_create_news_table.py`
+- ✅ Automatic database URL normalization
+
+### BLOCK 2: SQLAlchemy `News` Model ✅
+
+- ✅ Full `News` model with fields:
   - `id` (UUID, PK)
   - `title`, `source`, `url`, `published_at`, `category`
   - `raw_summary`, `althara_summary`, `tags`
   - `used_in_social` (Boolean)
-  - `created_at`, `updated_at` (timestamps automáticos)
+  - `created_at`, `updated_at` (automatic timestamps)
 
-### BLOQUE 3: Schemas Pydantic ✅
+### BLOCK 3: Pydantic Schemas ✅
 
-- ✅ `NewsBase` - Campos base
-- ✅ `NewsCreate` - Para crear noticias (sin id, timestamps)
-- ✅ `NewsRead` - Para leer noticias (incluye todos los campos)
+- ✅ `NewsBase` – Base fields
+- ✅ `NewsCreate` – For creating news (no id, timestamps)
+- ✅ `NewsRead` – For reading news (includes all fields)
 
-### BLOQUE 4: Router Completo ✅
+### BLOCK 4: Router ✅
 
-- ✅ `GET /api/health` - Health check
-- ✅ `POST /api/news` - Crear noticia
-- ✅ `GET /api/news` - Listar noticias (con filtros)
-- ✅ `GET /api/news/{id}` - Obtener noticia por ID
+- ✅ `GET /api/health` – Health check
+- ✅ `POST /api/news` – Create news
+- ✅ `GET /api/news` – List news (with filters)
+- ✅ `GET /api/news/{id}` – Get news by ID
 
-### BLOQUE 5: Conexión a Neon y Pruebas ✅
+### BLOCK 5: Neon Connection and Tests ✅
 
-- ✅ Conexión a Neon PostgreSQL configurada
-- ✅ Migraciones ejecutadas correctamente
-- ✅ Tabla `news` creada en Neon
-- ✅ Servidor FastAPI funcionando
-- ✅ Endpoints probados y funcionando
+- ✅ Neon PostgreSQL connection configured
+- ✅ Migrations run correctly
+- ✅ `news` table created in Neon
+- ✅ FastAPI server running
+- ✅ Endpoints tested and working
 
-### EXTRAS: Categorías Definidas ✅
+### EXTRAS: Defined Categories ✅
 
-- ✅ 21 categorías inmobiliarias documentadas en `app/constants.py`
-- ✅ Constantes disponibles para uso en el código
+- ✅ 21 real estate categories in `app/constants.py`
+- ✅ Constants available for use in code
 
-### BLOQUE 6: Sistema de Ingestión ✅
+### BLOCK 6: Ingestion System ✅
 
-- ✅ Configuración con Pydantic Settings (`app/config.py`)
-- ✅ 8 fuentes RSS reales configuradas (`app/ingestion/rss_ingestor.py`)
-- ✅ Router de administración (`app/routers/admin.py`)
-- ✅ Endpoints para disparar ingestión (`/api/admin/ingest`)
+- ✅ Pydantic Settings (`app/config.py`)
+- ✅ 8 real RSS sources (`app/ingestion/rss_ingestor.py`)
+- ✅ Admin router (`app/routers/admin.py`)
+- ✅ Endpoints to trigger ingestion (`/api/admin/ingest`)
 
-### BLOQUE 7: Adapter Althara ✅
+### BLOCK 7: Althara Adapter ✅
 
-- ✅ Adapter para transformar noticias al tono Althara (`app/adapters/news_adapter.py`)
-- ✅ Función `build_althara_summary()` con tono analítico por categoría
-- ✅ Endpoint para adaptar noticias pendientes (`POST /api/admin/adapt-pending`)
-- ✅ Pipeline completo: Ingesta → Adaptación → Consulta
+- ✅ Adapter to transform news to Althara tone (`app/adapters/news_adapter.py`)
+- ✅ `build_althara_summary()` with analytical tone by category
+- ✅ Endpoint to adapt pending news (`POST /api/admin/adapt-pending`)
+- ✅ Full pipeline: Ingest → Adapt → Query
 
-### BLOQUE 8: Automatización y Control de Volumen ✅
+### BLOCK 8: Automation and Volume Control ✅
 
-- ✅ Límite configurado: 5 noticias por fuente (máximo ~40 por ejecución)
-- ✅ Endpoint todo-en-uno: `POST /api/admin/ingest-and-adapt` (pipeline completo)
-- ✅ Sistema de deduplicación automática por URL
-- ✅ Listo para automatización con servicios externos (cron-jobs, servicios cloud)
+- ✅ Limit: 5 news per source (max ~40 per run)
+- ✅ All-in-one endpoint: `POST /api/admin/ingest-and-adapt`
+- ✅ Automatic deduplication by URL
+- ✅ Ready for external automation (cron, cloud services)
 
 ---
 
-## 🛠️ Requisitos
+## ⚡ Quick Start
+
+```bash
+# 1. Create and activate virtual environment
+python3.11 -m venv venv
+source venv/bin/activate   # Windows: venv\Scripts\activate
+
+# 2. Install dependencies
+pip install -r requirements.txt
+
+# 3. Create .env with your DATABASE_URL (Neon, use -pooler endpoint)
+# DATABASE_URL=postgresql+asyncpg://user:pass@ep-xxx-pooler.us-east-1.aws.neon.tech/neondb
+# Optional: SQL_ECHO=true to see queries in logs (prod: false)
+
+# 4. Run migrations
+alembic upgrade head
+
+# 5. Start the server
+uvicorn app.main:app --reload
+```
+
+- **API**: http://localhost:8000
+- **Docs**: http://localhost:8000/docs
+- **News Studio UI**: http://localhost:8000/ui
+
+---
+
+## 🛠️ Requirements
 
 - Python 3.11+
 - PostgreSQL (Neon)
-- Cuenta en Neon con proyecto creado
+- Neon account with project created
 
 ---
 
-## 🚀 Instalación y Configuración
+## 🚀 Installation and Configuration
 
-### 1. Crear ambiente virtual
+### 1. Create virtual environment
 
 ```bash
 python3.11 -m venv venv
-source venv/bin/activate  # En Windows: venv\Scripts\activate
+source venv/bin/activate  # Windows: venv\Scripts\activate
 ```
 
-### 2. Instalar requirements
+### 2. Install requirements
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Configurar variables de entorno
+### 3. Configure environment variables
 
-**Crear un archivo `.env` en la raíz del proyecto** con tu URL de Neon:
+**Create a `.env` file in the project root** with your Neon URL:
 
 ```env
-DATABASE_URL=postgresql+asyncpg://neondb_owner:TU_PASSWORD@ep-xxx-xxx-pooler.us-east-1.aws.neon.tech/neondb
+DATABASE_URL=postgresql+asyncpg://neondb_owner:YOUR_PASSWORD@ep-xxx-xxx-pooler.us-east-1.aws.neon.tech/neondb
 ```
 
-**Puntos importantes:**
+**Important:**
 
-- ⚠️ **Debe empezar por `postgresql+asyncpg://`** (no solo `postgresql://`) para conexiones async
-- Obtén tu `DATABASE_URL` desde el dashboard de Neon
-- El archivo `.env` ya está en `.gitignore`, así que tus credenciales están seguras
-- ⚡ **Normalización automática**: El código convierte automáticamente:
+- ⚠️ **Must start with `postgresql+asyncpg://`** (not plain `postgresql://`) for async connections
+- Get `DATABASE_URL` from the Neon dashboard
+- `.env` is in `.gitignore`, so credentials stay private
+- ⚡ **Automatic normalization**: The code converts:
   - `postgresql://` → `postgresql+asyncpg://`
-  - Elimina parámetros incompatibles (`sslmode`, `channel_binding`)
-  - asyncpg maneja SSL automáticamente
+  - Removes incompatible params (`sslmode`, `channel_binding`)
+  - asyncpg handles SSL automatically
 
-**Ejemplo de formato completo:**
+**Full format example:**
 
 ```
-DATABASE_URL=postgresql+asyncpg://usuario:password@host:puerto/database
+DATABASE_URL=postgresql+asyncpg://user:password@host:port/database
 ```
 
-**Nota:** Si copias la URL directamente de Neon y tiene `postgresql://` o parámetros SSL, el código los normalizará automáticamente.
+**Note:** If you copy the URL from Neon and it has `postgresql://` or SSL params, the code will normalize it automatically.
 
-### 4. Ejecutar migraciones
+### 4. Run migrations
 
-Con el entorno virtual activado, ejecutar:
+With the virtual environment active:
 
 ```bash
 alembic upgrade head
 ```
 
-Esto creará la tabla `news` en tu base de datos Neon.
+This creates the `news` table in your Neon database.
 
-**Salida esperada:**
+**Expected output:**
 
 ```
 INFO  [alembic.runtime.migration] Running upgrade  -> 001_initial, Initial migration: create news table
 ```
 
-### 5. Ejecutar el servidor
+### 5. Start the server
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-El servidor estará disponible en `http://localhost:8000`
+Server will be available at `http://localhost:8000`
 
-**Salida esperada:**
+**Expected output:**
 
 ```
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
@@ -181,31 +211,31 @@ INFO:     Application startup complete.
 
 ---
 
-## ✅ Estado Actual
+## ✅ Current Status
 
-### Completado y Funcionando:
+### Working:
 
-- ✅ **Base de datos Neon** - Conectada y funcionando
-- ✅ **Migraciones Alembic** - Tabla `news` creada
-- ✅ **Servidor FastAPI** - Corriendo en `http://localhost:8000`
-- ✅ **Conexión async** - SQLAlchemy async funcionando correctamente
-- ✅ **Health Check** - `GET /api/health` responde `{"status": "ok"}`
-- ✅ **Endpoints CRUD** - Todos los endpoints básicos funcionando
-- ✅ **Normalización de URLs** - Manejo automático de parámetros SSL
+- ✅ **Neon database** – Connected and working
+- ✅ **Alembic migrations** – `news` table created
+- ✅ **FastAPI server** – Running at `http://localhost:8000`
+- ✅ **Async connection** – SQLAlchemy async working correctly
+- ✅ **Health Check** – `GET /api/health` returns `{"status": "ok"}`
+- ✅ **CRUD endpoints** – All basic endpoints working
+- ✅ **URL normalization** – Automatic SSL param handling
 
-### Sistema Completo y Funcionando:
+### Full system:
 
-- ✅ **Ingestor de noticias RSS** - 8 fuentes reales configuradas
-- ✅ **Adapter Althara** - Transformación automática al tono Althara
-- ✅ **Control de volumen** - Límite de 5 noticias por fuente
-- ✅ **Automatización** - Endpoint todo-en-uno listo para servicios externos
+- ✅ **RSS news ingestor** – 8 real sources configured
+- ✅ **Althara adapter** – Automatic transformation to Althara tone
+- ✅ **Volume control** – 5 news per source limit
+- ✅ **Automation** – All-in-one endpoint ready for external services
 
 ---
 
-## 📖 Documentación de la API
+## 📖 API Documentation
 
-- **Swagger UI**: `http://localhost:8000/docs` → Interfaz interactiva para probar endpoints
-- **ReDoc**: `http://localhost:8000/redoc` → Documentación alternativa
+- **Swagger UI**: `http://localhost:8000/docs` – Interactive interface to test endpoints
+- **ReDoc**: `http://localhost:8000/redoc` – Alternative docs
 
 ---
 
@@ -213,262 +243,244 @@ INFO:     Application startup complete.
 
 ### Health Check
 
-- `GET /api/health` - Health check del servicio
-  - Respuesta: `{"status": "ok"}`
+- `GET /api/health` – Service health check
+  - Response: `{"status": "ok"}`
 
-### Noticias
+### News
 
-- `POST /api/news` - Crear una nueva noticia
+- `POST /api/news` – Create a new news item
 
   - Body: `NewsCreate` (JSON)
-  - Respuesta: `NewsRead` (con id, timestamps)
+  - Response: `NewsRead` (with id, timestamps)
 
-- `GET /api/news` - Listar noticias
+- `GET /api/news` – List news
 
-  - Query params opcionales:
-    - `category` (str) - Filtrar por categoría
-    - `q` (str) - Buscar en título
-    - `from_date` (datetime) - Fecha desde
-    - `to_date` (datetime) - Fecha hasta
-  - Respuesta: Array de `NewsRead`
+  - Optional query params:
+    - `category` (str) – Filter by category
+    - `q` (str) – Search in title
+    - `from_date` (datetime) – Date from
+    - `to_date` (datetime) – Date to
+  - Response: Array of `NewsRead`
 
-- `GET /api/news/{id}` - Obtener noticia por ID
+- `GET /api/news/{id}` – Get news by ID
   - Path param: `id` (UUID)
-  - Respuesta: `NewsRead` o 404
+  - Response: `NewsRead` or 404
 
-### Administración - Ingestión y Adaptación
+### Admin – Ingestion and Adaptation
 
-- `POST /api/admin/ingest` - Ingestar noticias desde todas las fuentes RSS
+- `POST /api/admin/ingest` – Ingest news from all RSS sources
 
-  - Límite: 5 noticias por fuente (máximo ~40 por ejecución)
-  - Respuesta: `{"Expansion Inmobiliario": <int>, "Cinco Días - Economía Inmobiliaria": <int>, ...}`
+  - Limit: 5 news per source (max ~40 per run)
+  - Response: `{"Expansion Inmobiliario": <int>, ...}`
 
-- `POST /api/admin/ingest/rss` - Alias del endpoint principal (mismo resultado)
+- `POST /api/admin/ingest/rss` – Alias of main endpoint (same result)
 
-- `POST /api/admin/adapt-pending` - Adaptar noticias pendientes al tono Althara
+- `POST /api/admin/adapt-pending` – Adapt pending news to Althara tone
 
-  - Busca noticias con `althara_summary = NULL` y las adapta
-  - Respuesta: `{"adapted": <int>, "message": "..."}`
+  - Finds news with `althara_summary = NULL` and adapts them
+  - Response: `{"adapted": <int>, "message": "..."}`
 
-- `POST /api/admin/ingest-and-adapt` - Pipeline completo (todo-en-uno)
+- `POST /api/admin/ingest-and-adapt` – Full pipeline (all-in-one)
 
-  - Ejecuta ingesta (5 por fuente) + adaptación en una sola llamada
-  - Ideal para automatización externa (cron-jobs, servicios cloud)
-  - Respuesta: `{"ingested": <int>, "ingested_by_source": {...}, "adapted": <int>, "message": "..."}`
+  - Runs ingest (5 per source) + adaptation in one call
+  - Ideal for external automation (cron, cloud services)
+  - Response: `{"ingested": <int>, "ingested_by_source": {...}, "adapted": <int>, "message": "..."}`
 
 ---
 
-## 📥 Ingestión de Noticias
+## 📥 News Ingestion
 
-El microservicio incluye un sistema de ingestión para obtener noticias automáticamente desde fuentes externas.
+The microservice includes an ingestion system to fetch news automatically from external sources.
 
-### Fuentes Disponibles
+### Available Sources
 
-⚠️ **IMPORTANTE: Idealista NO tiene API de noticias**
+⚠️ **IMPORTANT: Idealista has NO news API**
 
-Idealista NO ofrece una API pública para obtener noticias. Su API solo incluye búsqueda de propiedades y datos de mercado.
+Idealista does not provide a public news API. Its API only includes property search and market data.
 
-**Nota sobre Newsletter de Idealista:** Aunque Idealista tiene una newsletter semanal por email, no es viable automatizarla porque:
+**Idealista newsletter note:** Although Idealista has a weekly email newsletter, automating it is not feasible because:
 
-- Solo está disponible por email (no RSS/API)
-- Requeriría parsing complejo de emails HTML
-- Las fuentes RSS que tenemos son mejores: automáticas, legales y estables
+- It is only available by email (no RSS/API)
+- Would require complex HTML email parsing
+- Our RSS sources are better: automatic, legal and stable
 
-**Fuentes reales configuradas (8 fuentes RSS):**
+**Configured RSS sources (8):**
 
-1. **RSS - Expansion Inmobiliario** - Noticias de mercado, hipotecas, inversión
-2. **RSS - Cinco Días** - Economía inmobiliaria
-3. **RSS - El Economista** - Vivienda y mercado
-4. **RSS - BOE Subastas** - Subastas inmobiliarias
-5. **RSS - BOE General** - Normativas y leyes
-6. **RSS - Observatorio Inmobiliario** - Análisis del sector
-7. **RSS - Interempresas Construcción** - Noticias de construcción
-8. **RSS - ArchDaily** - Arquitectura y construcción
+1. **RSS – Expansion Inmobiliario** – Market, mortgages, investment news
+2. **RSS – Cinco Días** – Real estate economy
+3. **RSS – El Economista** – Housing and market
+4. **RSS – BOE Subastas** – Real estate auctions
+5. **RSS – BOE General** – Regulations and laws
+6. **RSS – Observatorio Inmobiliario** – Sector analysis
+7. **RSS – Interempresas Construcción** – Construction news
+8. **RSS – ArchDaily** – Architecture and construction
 
-### Endpoints de Administración
+### Admin Endpoints
 
-#### Ingestar Noticias desde Fuentes RSS
+#### Ingest News from RSS
 
 ```bash
 POST /api/admin/ingest
-# O también:
+# Or:
 POST /api/admin/ingest/rss
 ```
 
-**Respuesta:**
+**Response:**
 
 ```json
 {
   "Expansion Inmobiliario": 10,
   "Cinco Días - Economía Inmobiliaria": 5,
-  "El Economista - Vivienda": 8,
-  "BOE Subastas": 3,
-  "BOE General": 2,
-  "Observatorio Inmobiliario": 4,
-  "Interempresas Construcción": 6,
-  "Plataforma Arquitectura": 3
+  ...
 }
 ```
 
-**Descripción:** Ingesta noticias desde todas las fuentes RSS configuradas (8 fuentes reales). El sistema evita duplicados comparando las URLs.
+**Description:** Ingests news from all configured RSS sources. The system avoids duplicates by comparing URLs.
 
-**Límite configurado:** Máximo 5 noticias por fuente por ejecución (total máximo ~40 noticias). Esto controla el volumen y mantiene solo las más recientes.
+**Configured limit:** Max 5 news per source per run (total max ~40). This controls volume and keeps only the most recent.
 
-**Nota:** Idealista NO tiene API de noticias, por eso solo usamos fuentes RSS legales.
+**Note:** Idealista has no news API, so we only use legal RSS sources.
 
-### Ejemplo de Uso
+### Usage Example
 
-**Usando curl:**
+**Using curl:**
 
 ```bash
-# Ingestar noticias desde todas las fuentes RSS
+# Ingest news from all RSS sources
 curl -X POST "http://localhost:8000/api/admin/ingest"
 
-# O usando el alias
+# Or using the alias
 curl -X POST "http://localhost:8000/api/admin/ingest/rss"
 ```
 
-**Usando Swagger UI:**
+**Using Swagger UI:**
 
-1. Ve a `http://localhost:8000/docs`
-2. Busca la sección `admin`
-3. Expande `POST /api/admin/ingest`
-4. Haz clic en "Try it out" y luego "Execute"
+1. Go to `http://localhost:8000/docs`
+2. Find the `admin` section
+3. Expand `POST /api/admin/ingest`
+4. Click "Try it out" then "Execute"
 
-### Configuración de Fuentes RSS
+### RSS Source Configuration
 
-Las fuentes RSS están configuradas en `app/ingestion/rss_ingestor.py` en la variable `RSS_SOURCES`.
+Sources are configured in `app/ingestion/rss_ingestor.py` in the `RSS_SOURCES` variable.
 
-**Fuentes RSS actuales (reales y funcionales):**
+**Current RSS sources:**
 
-- Expansion Inmobiliario: `https://e00-expansion.uecdn.es/rss/inmobiliario.xml`
-- Cinco Días: `https://cincodias.elpais.com/rss/act/economia_inmobiliaria/`
-- El Economista: `https://www.eleconomista.es/rss/rss-vivienda.php`
-- BOE Subastas: `https://subastas.boe.es/rss.php`
-- BOE General: `https://www.boe.es/diario_boe/xml.php?id=BOE-S`
-- Observatorio Inmobiliario: `https://www.observatorioinmobiliario.es/rss/`
-- Interempresas Construcción: `https://www.interempresas.net/construccion/RSS/`
-- ArchDaily: `https://www.archdaily.mx/mx/rss`
+- Expansion Inmobiliario, Cinco Días, El Economista, BOE Subastas, BOE General, Observatorio Inmobiliario, Interempresas Construcción, ArchDaily
 
-Ver `FUENTES_RSS.md` para más detalles sobre cada fuente.
+See `FUENTES_RSS.md` for details on each source.
 
-### Control de Volumen
+### Volume Control
 
-- **Límite configurado:** 5 noticias por fuente por ejecución
-- **Máximo por ejecución:** ~40 noticias (8 fuentes × 5)
-- **Deduplicación automática:** El sistema evita insertar noticias duplicadas comparando la URL
-- **Control de calidad:** Solo las noticias más recientes se procesan
+- **Configured limit:** 5 news per source per run
+- **Max per run:** ~40 news (8 sources × 5)
+- **Automatic deduplication:** Duplicate URLs are skipped
+- **Quality control:** Only the most recent news are processed
 
-### Notas Importantes
+### Important Notes
 
-- **Idealista NO tiene API de noticias:** Su API solo incluye búsqueda de propiedades, no noticias. Por eso no tenemos endpoint de Idealista.
-- **Newsletter de Idealista:** Aunque existe, no es viable automatizarla (solo email, no RSS/API). Las fuentes RSS son mejores.
-- **Fuentes RSS reales:** Todas las noticias vienen de 8 fuentes RSS legales y funcionando (Expansion, BOE, Cinco Días, etc.)
-- **Deduplicación:** El sistema evita insertar noticias duplicadas comparando la URL
-- **Configuración:** Todas las fuentes RSS están listas y funcionando. No se requiere configuración adicional.
+- **Idealista has no news API** – Its API is for property search only, not news.
+- **Idealista newsletter:** Exists but is not automatable (email only, no RSS/API). RSS sources are better.
+- **Real RSS sources:** All news come from 8 legal, working RSS feeds.
+- **Deduplication:** URLs are compared to avoid duplicates.
+- **Configuration:** All RSS sources are ready; no extra setup needed.
 
 ---
 
-## 🎨 Adapter Althara
+## 🎨 Althara Adapter
 
-El sistema incluye un adapter para transformar noticias al tono Althara, ideal para redes sociales.
+The system includes an adapter to transform news to Althara tone, suitable for social media.
 
-### Endpoint de Adaptación
+### Adaptation Endpoint
 
-- `POST /api/admin/adapt-pending` - Adapta noticias pendientes al tono Althara
+- `POST /api/admin/adapt-pending` – Adapts pending news to Althara tone
 
-  - Busca todas las noticias con `althara_summary = NULL`
-  - Las transforma usando el adapter Althara
-  - Guarda el resultado en `althara_summary`
-  - Respuesta: `{"adapted": <número>, "message": "..."}`
+  - Finds all news with `althara_summary = NULL`
+  - Transforms them using the Althara adapter
+  - Saves result in `althara_summary`
+  - Response: `{"adapted": <int>, "message": "..."}`
 
-### Cómo Funciona
+### How It Works
 
-El adapter genera un resumen estructurado:
+The adapter produces a structured summary:
 
-1. **Primera línea:** Resumen frío del hecho (título + resumen recortado)
-2. **Líneas siguientes:** Interpretación analítica según la categoría
-3. **Sin fuente:** La fuente se añadirá en el frontend
+1. **First line:** Neutral summary of the fact (title + trimmed summary)
+2. **Next lines:** Analytical interpretation by category
+3. **Source:** Added in the frontend
 
-### Tono Analítico por Categoría
+### Analytical Tone by Category
 
-El adapter usa diferentes tonos analíticos según la categoría:
+The adapter uses different analytical tones per category:
 
-- **PRECIOS_VIVIENDA:** Análisis de tendencias de mercado
-- **FONDOS_INVERSION:** Evolución de estrategias de inversión
-- **GRANDES_INVERSIONES:** Dinámicas sectoriales
-- **NOTICIAS_HIPOTECAS:** Indicadores de salud del mercado
-- **NOTICIAS_BOE_SUBASTAS:** Oportunidades que requieren análisis técnico
-- **NORMATIVAS:** Impacto en el ecosistema inmobiliario
-- **CONSTRUCCION:** Tendencias de demanda y evolución del sector
+- **PRECIOS_VIVIENDA:** Market trend analysis
+- **FONDOS_INVERSION:** Investment strategy evolution
+- **GRANDES_INVERSIONES:** Sector dynamics
+- **NOTICIAS_HIPOTECAS:** Market health indicators
+- **NOTICIAS_BOE_SUBASTAS:** Opportunities requiring technical analysis
+- **NORMATIVAS:** Impact on real estate ecosystem
+- **CONSTRUCCION:** Demand trends and sector evolution
 
-### Pipeline Completo
+### Full Pipeline
 
-**Opción 1: Pasos separados**
-
-```
-1. POST /api/admin/ingest          → Ingesta noticias (raw_summary)
-2. POST /api/admin/adapt-pending   → Adapta al tono Althara (althara_summary)
-3. GET /api/news                   → Noticias listas para redes sociales
-```
-
-**Opción 2: Todo-en-uno (recomendado para automatización)**
+**Option 1: Separate steps**
 
 ```
-1. POST /api/admin/ingest-and-adapt → Ingesta + Adapta en una sola llamada
-2. GET /api/news                    → Noticias listas para redes sociales
+1. POST /api/admin/ingest          → Ingest news (raw_summary)
+2. POST /api/admin/adapt-pending   → Adapt to Althara (althara_summary)
+3. GET /api/news                   → News ready for social media
 ```
 
-El endpoint `/ingest-and-adapt` es ideal para automatización externa (cron-jobs, servicios cloud) porque ejecuta todo el pipeline de una vez.
+**Option 2: All-in-one (recommended for automation)**
+
+```
+1. POST /api/admin/ingest-and-adapt → Ingest + Adapt in one call
+2. GET /api/news                    → News ready for social media
+```
+
+The `/ingest-and-adapt` endpoint is ideal for external automation (cron, cloud services) because it runs the full pipeline in one call.
 
 ---
 
-## 📂 Categorías de Noticias
+## 📂 News Categories
 
-El sistema utiliza 21 categorías definidas para noticias inmobiliarias. Todas las constantes están en `app/constants.py`.
+The system uses 21 categories for real estate news. Constants are in `app/constants.py`.
 
-### Fondos e Inversión
+### Funds and Investment
 
-- `FONDOS_INVERSION_INMOBILIARIA` - Fondos de inversión inmobiliaria
-- `GRANDES_INVERSIONES_INMOBILIARIAS` - Noticias grandes inversiones inmobiliarias
-- `MOVIMIENTOS_GRANDES_TENEDORES` - Movimientos de grandes tenedores
-- `TOKENIZATION_ACTIVOS` - Tokenization activos
+- `FONDOS_INVERSION_INMOBILIARIA`
+- `GRANDES_INVERSIONES_INMOBILIARIAS`
+- `MOVIMIENTOS_GRANDES_TENEDORES`
+- `TOKENIZATION_ACTIVOS`
 
-### Noticias Generales
+### General News
 
-- `NOTICIAS_INMOBILIARIAS` - Noticias inmobiliarias
-- `NOTICIAS_HIPOTECAS` - Noticias hipotecas
-- `NOTICIAS_LEYES_OKUPAS` - Noticias leyes okupas
-- `NOTICIAS_BOE_SUBASTAS` - Noticias BOE subastas inmobiliarias
-- `NOTICIAS_DESAHUCIOS` - Noticias desahucios
-- `NOTICIAS_CONSTRUCCION` - Noticias sobre construcción
+- `NOTICIAS_INMOBILIARIAS`, `NOTICIAS_HIPOTECAS`, `NOTICIAS_LEYES_OKUPAS`, `NOTICIAS_BOE_SUBASTAS`, `NOTICIAS_DESAHUCIOS`, `NOTICIAS_CONSTRUCCION`
 
-### Precios y Mercado
+### Prices and Market
 
-- `PRECIOS_VIVIENDA` - Precios de vivienda
-- `PRECIOS_MATERIALES` - Precios materiales
-- `PRECIOS_SUELO` - Precios del suelo
+- `PRECIOS_VIVIENDA`, `PRECIOS_MATERIALES`, `PRECIOS_SUELO`
 
-### Análisis y Tendencias
+### Analysis and Trends
 
-- `FUTURO_SECTOR_INMOBILIARIO` - Futuro sector inmobiliario
-- `BURBUJA_INMOBILIARIA` - Burbuja inmobiliaria
+- `FUTURO_SECTOR_INMOBILIARIO`, `BURBUJA_INMOBILIARIA`
 
-### Alquiler y Normativas
+### Rentals and Regulations
 
-- `ALQUILER_VACACIONAL` - Alquiler vacacional
-- `NORMATIVAS_VIVIENDAS` - Normativas de viviendas
-- `FALTA_VIVIENDA` - Falta de vivienda
+- `ALQUILER_VACACIONAL`, `NORMATIVAS_VIVIENDAS`, `FALTA_VIVIENDA`
 
-### Construcción y Urbanización
+### Construction and Urbanization
 
-- `NOTICIAS_URBANIZACION` - Noticias sobre urbanización
-- `NOVEDADES_CONSTRUCCION` - Novedades de construcción
-- `CONSTRUCCION_MODULAR` - Construcción modular
+- `NOTICIAS_URBANIZACION`, `NOVEDADES_CONSTRUCCION`, `CONSTRUCCION_MODULAR`
 
 ---
 
-## 🧪 Pruebas del Microservicio
+## 🧪 Testing
+
+### Run tests
+
+```bash
+python3 -m pytest tests/ -v --tb=short
+```
 
 ### 1. Health Check
 
@@ -476,105 +488,109 @@ El sistema utiliza 21 categorías definidas para noticias inmobiliarias. Todas l
 curl http://localhost:8000/api/health
 ```
 
-Respuesta esperada:
+Expected: `{"status": "ok"}`
+
+### 2. Create news (POST /news)
+
+**Option A: Swagger UI (recommended)**
+
+1. Go to `http://localhost:8000/docs`
+2. Expand `POST /api/news`
+3. Click "Try it out"
+4. Use this JSON:
 
 ```json
 {
-  "status": "ok"
-}
-```
-
-### 2. Crear una noticia (POST /news)
-
-**Opción A: Usando Swagger UI (Recomendado)**
-
-1. Ve a `http://localhost:8000/docs`
-2. Expande `POST /api/news`
-3. Haz clic en "Try it out"
-4. Usa este JSON:
-
-```json
-{
-  "title": "Prueba conexión Neon",
+  "title": "Test Neon connection",
   "source": "Test Local",
   "url": "https://example.com/test",
   "published_at": "2025-12-05T10:30:00Z",
   "category": "PRECIOS_VIVIENDA",
-  "raw_summary": "Resumen bruto de prueba",
-  "althara_summary": "Lectura Althara de prueba",
+  "raw_summary": "Raw summary for test",
+  "althara_summary": "Althara reading for test",
   "tags": "test,neon",
   "used_in_social": false
 }
 ```
 
-5. Haz clic en "Execute"
+5. Click "Execute"
 
-**Opción B: Usando curl**
+**Option B: curl**
 
 ```bash
 curl -X POST "http://localhost:8000/api/news" \
   -H "Content-Type: application/json" \
   -d '{
-    "title": "Prueba conexión Neon",
+    "title": "Test Neon connection",
     "source": "Test Local",
     "url": "https://example.com/test",
     "published_at": "2025-12-05T10:30:00Z",
     "category": "PRECIOS_VIVIENDA",
-    "raw_summary": "Resumen bruto de prueba",
-    "althara_summary": "Lectura Althara de prueba",
+    "raw_summary": "Raw summary for test",
+    "althara_summary": "Althara reading for test",
     "tags": "test,neon",
     "used_in_social": false
 }'
 ```
 
-**Ejemplo mínimo requerido:**
+**Minimum required example:**
 
 ```json
 {
-  "title": "Nueva noticia de ejemplo",
-  "source": "Ejemplo Source",
-  "url": "https://example.com/noticia",
+  "title": "Example news",
+  "source": "Example Source",
+  "url": "https://example.com/news",
   "published_at": "2025-12-05T10:30:00Z",
   "category": "NOTICIAS_INMOBILIARIAS",
   "used_in_social": false
 }
 ```
 
-### 3. Listar noticias (GET /news)
+### 3. List news (GET /news)
 
 ```bash
-# Listar todas las noticias
+# List all news
 curl http://localhost:8000/api/news
 
-# Filtrar por categoría
+# Filter by domain (tech | real_estate)
+curl "http://localhost:8000/api/news?domain=tech"
+curl "http://localhost:8000/api/news?domain=real_estate"
+
+# Filter by category
 curl "http://localhost:8000/api/news?category=PRECIOS_VIVIENDA"
 
-# Buscar por texto en título
-curl "http://localhost:8000/api/news?q=vivienda"
+# Only news with IG draft
+curl "http://localhost:8000/api/news?only_with_draft=true"
 
-# Filtrar por rango de fechas
+# Order by relevance (tech)
+curl "http://localhost:8000/api/news?domain=tech&order_by=relevance_score"
+
+# Search in title
+curl "http://localhost:8000/api/news?q=housing"
+
+# Filter by date range
 curl "http://localhost:8000/api/news?from_date=2025-12-01T00:00:00Z&to_date=2025-12-31T23:59:59Z"
 
-# Combinar filtros
-curl "http://localhost:8000/api/news?category=NOTICIAS_HIPOTECAS&q=hipoteca&from_date=2025-12-01T00:00:00Z"
+# Combine filters
+curl "http://localhost:8000/api/news?category=NOTICIAS_HIPOTECAS&q=mortgage&from_date=2025-12-01T00:00:00Z"
 ```
 
-### 4. Obtener una noticia por ID (GET /news/{id})
+### 4. Get news by ID (GET /news/{id})
 
 ```bash
 curl http://localhost:8000/api/news/{id}
 ```
 
-Reemplaza `{id}` con el UUID de la noticia obtenido en el POST anterior.
+Replace `{id}` with the news UUID from the POST response.
 
-### 5. Probar ingesta y adaptación (POST /admin/ingest-and-adapt)
+### 5. Test ingestion and adaptation (POST /admin/ingest-and-adapt)
 
 ```bash
-# Pipeline completo: ingesta + adaptación
+# Full pipeline: ingest + adapt
 curl -X POST "http://localhost:8000/api/admin/ingest-and-adapt" | python3 -m json.tool
 ```
 
-**Respuesta esperada:**
+**Expected response:**
 
 ```json
 {
@@ -582,136 +598,132 @@ curl -X POST "http://localhost:8000/api/admin/ingest-and-adapt" | python3 -m jso
   "ingested_by_source": {
     "Expansion Inmobiliario": 5,
     "BOE Subastas": 3,
-    "Cinco Días - Economía Inmobiliaria": 2,
     ...
   },
   "adapted": 20,
-  "message": "Pipeline completo: 15 noticias ingeridas, 20 adaptadas"
+  "message": "Full pipeline: 15 ingested, 20 adapted"
 }
 ```
 
-**También puedes probar los endpoints individuales:**
+**Individual endpoints:**
 
 ```bash
-# Solo ingesta
+# Ingest only
 curl -X POST "http://localhost:8000/api/admin/ingest"
 
-# Solo adaptación
+# Adapt only
 curl -X POST "http://localhost:8000/api/admin/adapt-pending"
 ```
 
-### Verificar que funciona con Neon
+### Verify Neon works
 
-Después de crear una noticia con POST, ejecuta:
+After creating news with POST, run:
 
 ```bash
 curl http://localhost:8000/api/news
 ```
 
-Si te devuelve un array con la noticia que acabas de crear, significa:
+If you get an array with the news you created:
 
-- ✅ FastAPI funciona
-- ✅ Alembic creó la tabla en Neon
-- ✅ Conexión con Neon OK
-- ✅ Endpoints básicos OK
+- ✅ FastAPI works
+- ✅ Alembic created the table in Neon
+- ✅ Neon connection OK
+- ✅ Basic endpoints OK
 
 ---
 
-## 📁 Estructura del proyecto
+## 📁 Project Structure
 
 ```
 althara-news-service/
 ├── app/
-│   ├── main.py              # Aplicación FastAPI
-│   ├── database.py          # Configuración de base de datos async (con normalización de URLs)
-│   ├── config.py            # Configuración con Pydantic Settings
-│   ├── constants.py         # Constantes y categorías
+│   ├── main.py
+│   ├── database.py
+│   ├── config.py
+│   ├── constants.py
 │   ├── routers/
-│   │   ├── news.py          # Endpoints de noticias
-│   │   └── admin.py         # Endpoints de administración (ingestión y adaptación)
+│   │   ├── news.py
+│   │   └── admin.py
 │   ├── models/
-│   │   └── news.py          # Modelo SQLAlchemy async
+│   │   └── news.py
 │   ├── schemas/
-│   │   └── news.py          # Schemas Pydantic (NewsBase, NewsCreate, NewsRead)
+│   │   └── news.py
 │   ├── ingestion/
-│   │   ├── rss_ingestor.py  # Ingestor de fuentes RSS
-│   │   └── idealista_client.py  # Cliente mock para Idealista (no usado para noticias)
+│   │   ├── rss_ingestor.py
+│   │   └── idealista_client.py
+│   ├── utils/
+│   │   ├── html_utils.py
+│   │   ├── rss_utils.py
+│   │   ├── guardrails.py
+│   │   └── text_compaction.py
 │   └── adapters/
-│       └── news_adapter.py  # Adapter para transformar noticias al tono Althara
-├── alembic/                 # Migraciones
-│   ├── env.py               # Configuración async de Alembic (con normalización de URLs)
-│   └── versions/
-│       └── 001_initial_migration_create_news_table.py
+│       └── news_adapter.py
+├── alembic/
 ├── scripts/
-│   └── ingest_news.py       # Script standalone para ingestión (cron jobs)
-├── alembic.ini              # Configuración Alembic (sin URL fija)
-├── requirements.txt         # Dependencias
-├── .env                     # Variables de entorno (crear manualmente)
-└── README.md                # Este archivo
+├── tests/
+├── alembic.ini
+├── requirements.txt
+├── .env
+├── README.md
+└── REFACTOR_NOTES.md
 ```
 
 ---
 
-## 🛠️ Tecnologías
+## 🛠️ Technologies
 
-- **FastAPI**: Framework web moderno y rápido
-- **SQLAlchemy**: ORM async para Python
-- **Alembic**: Herramienta de migraciones de base de datos
-- **Pydantic**: Validación de datos y schemas
-- **asyncpg**: Driver async para PostgreSQL
-- **Uvicorn**: Servidor ASGI
-- **Neon**: PostgreSQL serverless
-- **feedparser**: Parser de feeds RSS/Atom para ingestión de noticias
+- **FastAPI** – Modern web framework
+- **SQLAlchemy** – Async ORM for Python
+- **Alembic** – Database migrations
+- **Pydantic** – Data validation and schemas
+- **asyncpg** – Async PostgreSQL driver
+- **Uvicorn** – ASGI server
+- **Neon** – Serverless PostgreSQL
+- **feedparser** – RSS/Atom feed parser for ingestion
 
 ---
 
-## 🔧 Problemas Resueltos
+## 🔧 Resolved Issues
 
-### Problema 1: Error con `psycopg2`
+### Issue 1: `psycopg2` error
 
 **Error:** `ModuleNotFoundError: No module named 'psycopg2'`
 
-**Causa:** La URL usaba `postgresql://` en lugar de `postgresql+asyncpg://`
+**Cause:** URL used `postgresql://` instead of `postgresql+asyncpg://`
 
-**Solución:**
+**Solution:** Code now converts `postgresql://` → `postgresql+asyncpg://` via `normalize_database_url()` in `app/database.py` and `alembic/env.py`
 
-- Código actualizado para convertir automáticamente `postgresql://` → `postgresql+asyncpg://`
-- Función `normalize_database_url()` en `app/database.py` y `alembic/env.py`
-
-### Problema 2: Error con parámetro `sslmode`
+### Issue 2: `sslmode` parameter error
 
 **Error:** `TypeError: connect() got an unexpected keyword argument 'sslmode'`
 
-**Causa:** `asyncpg` no acepta `sslmode` como parámetro de URL
+**Cause:** `asyncpg` does not accept `sslmode` in the URL
 
-**Solución:**
-
-- Código actualizado para eliminar automáticamente parámetros incompatibles (`sslmode`, `channel_binding`)
-- asyncpg maneja SSL automáticamente
+**Solution:** Code removes incompatible params (`sslmode`, `channel_binding`). asyncpg handles SSL automatically.
 
 ---
 
-## 🔄 Automatización
+## 🔄 Automation
 
-El sistema está listo para automatización externa. El endpoint `POST /api/admin/ingest-and-adapt` ejecuta todo el pipeline de una vez.
+The system is ready for external automation. `POST /api/admin/ingest-and-adapt` runs the full pipeline in one call.
 
-### Opciones de Automatización
+### Automation Options
 
-#### Opción 1: Servicios de Cron Online (Recomendado)
+#### Option 1: Online cron (recommended)
 
-**cron-job.org** (gratis):
+**cron-job.org** (free):
 
-1. Ve a [cron-job.org](https://cron-job.org)
-2. Crea cuenta
-3. Crea un nuevo cron job:
-   - **URL:** `https://tu-dominio.com/api/admin/ingest-and-adapt`
-   - **Método:** POST
-   - **Schedule:** Una vez por semana (ej: domingos 6 AM)
-   - ✅ Listo!
+1. Go to [cron-job.org](https://cron-job.org)
+2. Create account
+3. Create a new cron job:
+   - **URL:** `https://your-domain.com/api/admin/ingest-and-adapt`
+   - **Method:** POST
+   - **Schedule:** Once per week (e.g. Sundays 6 AM)
+   - ✅ Done!
 
-#### Opción 2: Vercel Cron (Si despliegas en Vercel)
+#### Option 2: Vercel Cron (if deploying on Vercel)
 
-Crea `vercel.json`:
+Create `vercel.json`:
 
 ```json
 {
@@ -724,114 +736,189 @@ Crea `vercel.json`:
 }
 ```
 
-#### Opción 3: Script Local + Cron
+#### Option 3: Local script + cron
 
-Si prefieres usar cron local, puedes usar el script `scripts/ingest_news.py`:
+Use `scripts/ingest_news.py`:
 
 ```bash
-# En crontab (crontab -e)
-0 6 * * 0 cd /ruta/al/proyecto && source venv/bin/activate && python scripts/ingest_news.py
+# In crontab (crontab -e)
+0 6 * * 0 cd /path/to/project && source venv/bin/activate && python scripts/ingest_news.py
 ```
 
-### Frecuencia Recomendada
+### Recommended frequency
 
-- **Una vez por semana** es suficiente para mantener el contenido actualizado sin saturar la base de datos
-- Con el límite de 5 por fuente, cada ejecución añadirá máximo ~40 noticias nuevas
-- La deduplicación evita duplicados automáticamente
+- **Once per week** is enough to keep content updated without overloading the database
+- With 5 per source limit, each run adds max ~40 new news items
+- Deduplication avoids duplicates automatically
 
 ---
 
-## 🎯 Próximos Pasos (Opcional)
+## 🎯 Next Steps (Optional)
 
-El sistema está **100% funcional**. Opciones para expandir:
+The system is **fully functional**. Optional expansions:
 
-1. 🔜 **Conectar con frontend** para visualizar noticias
-2. 🔜 **Añadir más fuentes RSS** si se necesitan
-3. 🔜 **Mejorar el adapter** con IA (GPT/Claude) para resúmenes más personalizados
-4. 🔜 **Añadir filtros avanzados** en el endpoint de noticias
-5. 🔜 **Sistema de tags** más sofisticado
+1. 🔜 Connect with frontend to display news
+2. 🔜 Add more RSS sources if needed
+3. 🔜 Improve adapter with AI (GPT/Claude) for more personalized summaries
+4. 🔜 Add advanced filters to the news endpoint
+5. 🔜 More sophisticated tagging
 
 ---
 
 ## 🐛 Troubleshooting
 
-### Error al ejecutar `alembic upgrade head`
+### Error running `alembic upgrade head`
 
-**Problemas comunes:**
+**Common issues:**
 
-- **`DATABASE_URL` no encontrada**
+- **`DATABASE_URL` not found**
+  - Ensure `.env` exists in the project root
+  - Ensure it has exactly that name (with the leading dot)
 
-  - Verifica que el archivo `.env` existe en la raíz del proyecto
-  - Verifica que tiene exactamente ese nombre (con el punto al inicio)
-
-- **Error de conexión**
-
-  - Verifica que tu URL de Neon sea correcta
-  - Verifica que el proyecto Neon esté activo en el dashboard
-  - Verifica que uses `postgresql+asyncpg://` (el código lo convierte automáticamente)
+- **Connection error**
+  - Check your Neon URL
+  - Check the Neon project is active in the dashboard
+  - Use `postgresql+asyncpg://` (code converts automatically)
 
 - **`ModuleNotFoundError: No module named 'psycopg2'`**
-
-  - Asegúrate de que la URL empiece con `postgresql+asyncpg://`
-  - El código debería convertirla automáticamente, pero verifica tu `.env`
+  - Ensure the URL starts with `postgresql+asyncpg://`
 
 - **`TypeError: connect() got an unexpected keyword argument 'sslmode'`**
-  - El código elimina automáticamente este parámetro
-  - Verifica que estés usando la última versión del código
+  - Code removes this param automatically
+  - Ensure you are on the latest version
 
-### Error al iniciar uvicorn
+### Error starting uvicorn
 
-- Verifica que todas las dependencias estén instaladas: `pip install -r requirements.txt`
-- Verifica que el entorno virtual esté activado
-- Verifica que `DATABASE_URL` esté en el archivo `.env`
-- Revisa los logs de error para más detalles
+- Ensure dependencies are installed: `pip install -r requirements.txt`
+- Ensure the virtual environment is activated
+- Ensure `DATABASE_URL` is in `.env`
+- Check error logs for details
 
-### Error 404 en endpoints
+### 404 on endpoints
 
-- Verifica que uses `/api/health` y `/api/news` (con el prefijo `/api`)
-- Los endpoints están bajo el prefijo `/api/` definido en `app/main.py`
-- El endpoint `/` no existe (los 404 son normales)
+- Use `/api/health` and `/api/news` (with `/api` prefix)
+- Endpoints are under `/api/` as defined in `app/main.py`
+- `/` does not exist (404 is normal)
 
 ### Error: "Table already exists"
 
-- No es un error grave, significa que la tabla ya existe
-- Puedes continuar con las pruebas normalmente
+- Not critical; it means the table already exists
+- You can continue testing normally
 
 ---
 
-## 📝 Notas Importantes
+## 📝 Important Notes
 
-- **Normalización automática**: El código normaliza automáticamente las URLs de base de datos
-- **SSL automático**: asyncpg maneja SSL automáticamente, no necesita parámetros
-- **Modo reload**: El servidor está en modo `--reload`, los cambios se aplican automáticamente
-- **Prefijo `/api`**: Todos los endpoints están bajo el prefijo `/api/`
-- **Límite de volumen**: 5 noticias por fuente (máximo ~40 por ejecución)
-- **Deduplicación**: El sistema evita duplicados automáticamente comparando URLs
-- **Idealista**: NO tiene API de noticias, solo usamos fuentes RSS legales
-
----
-
-## ✅ Resumen Final
-
-El microservicio está **100% funcional** y listo para producción:
-
-- ✅ Base de datos conectada (Neon PostgreSQL)
-- ✅ 8 fuentes RSS reales configuradas
-- ✅ Sistema de ingestión automática
-- ✅ Adapter Althara para transformar noticias
-- ✅ Control de volumen (5 por fuente)
-- ✅ Endpoint todo-en-uno para automatización
-- ✅ 21 categorías inmobiliarias definidas
-- ✅ Pipeline completo: Ingesta → Adaptación → Consulta
-
-**Sistema completo y listo para usar! 🚀**
+- **Automatic normalization:** Code normalizes database URLs
+- **Automatic SSL:** asyncpg handles SSL; no params needed
+- **Reload mode:** Server runs with `--reload`; changes apply automatically
+- **`/api` prefix:** All endpoints are under `/api/`
+- **Volume limit:** 5 news per source (max ~40 per run)
+- **Deduplication:** Duplicates avoided by comparing URLs
+- **Idealista:** Has no news API; we only use legal RSS sources
 
 ---
 
-## 📄 Licencia
+## ✅ Final Summary
 
-Este proyecto es privado y propiedad de Althara.
+The microservice is **fully functional** and production-ready:
+
+- ✅ Database connected (Neon PostgreSQL)
+- ✅ 8 real RSS sources configured
+- ✅ Automatic ingestion system
+- ✅ Althara adapter for news transformation
+- ✅ Volume control (5 per source)
+- ✅ All-in-one endpoint for automation
+- ✅ 21 real estate categories defined
+- ✅ Full pipeline: Ingest → Adapt → Query
 
 ---
 
-**Última actualización:** Diciembre 2025
+## 🎛 News Studio (UI)
+
+Internal interface for Marketing: brand selector, inbox, IG drafts and editor.
+
+### Access
+
+- **URL**: `GET /ui`
+- **Authentication**: BasicAuth when `UI_USER` and `UI_PASS` are set in `.env`:
+  ```env
+  UI_USER=admin
+  UI_PASS=your_secure_password
+  ```
+- Without credentials configured, the UI is open (development only).
+
+### Flow
+
+1. **Brand selector**: Choose Althara (real_estate) or Oxono (tech)
+2. **Portal**: Inbox | Drafts | Approved, with filters (date, query, category, only_without_draft)
+3. **News detail**: View news + "Generate IG" / "Generate variants" buttons
+4. **IG Editor**: Edit hook, carousel (5 slides), caption, hashtags, CTA. Copy caption/carousel/all. Approve / Mark published
+
+### "Generate more news" button
+
+- **Althara**: Calls `POST /api/admin/ingest-and-adapt?generate_ig=true`
+- **Oxono**: Calls `POST /api/tech/admin/ingest-and-generate`
+
+---
+
+## 🔄 "Generate more" Endpoints
+
+| Brand   | Endpoint                                           | Description                                      |
+|---------|----------------------------------------------------|--------------------------------------------------|
+| Althara | `POST /api/admin/ingest-and-adapt?generate_ig=true` | Ingest real estate RSS, adapt and generate drafts |
+| Oxono   | `POST /api/tech/admin/ingest-and-generate`          | Ingest tech RSS and generate drafts for new news  |
+
+For IG mutations (generate, variants, approve, publish) you can use `X-INGEST-TOKEN` if `INGEST_TOKEN` is set in `.env`.
+
+---
+
+## 🌐 Frontend Integration
+
+### Althara web (real estate)
+
+**No changes needed.** Existing `GET /api/news` calls work the same. By default, without `domain`, the API returns only `real_estate` news.
+
+```http
+GET /api/news?limit=20&offset=0&used_in_social=false
+```
+
+### Oxono web (tech) or other consumers
+
+To show only tech news, add `domain=tech`:
+
+```http
+GET /api/news?domain=tech&limit=20&offset=0
+```
+
+### List all news (admin/studio)
+
+```http
+GET /api/news?domain=all&limit=50
+```
+
+### Response fields
+
+Each news item may include:
+- `domain`: `"real_estate"` | `"tech"`
+- `relevance_score`: number or `null` (tech only)
+
+---
+
+## 📡 Adding new tech RSS feeds
+
+Edit `app/constants_tech.py`, add to `TECH_RSS_SOURCES`:
+
+```python
+{"name": "Name", "url": "https://...", "source": "Source", "default_category": TechNewsCategory.OTHER_TECH},
+```
+
+---
+
+## 📄 License
+
+This project is private and owned by Althara.
+
+---
+
+**Last updated:** February 2026

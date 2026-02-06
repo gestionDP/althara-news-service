@@ -1,8 +1,10 @@
-from sqlalchemy import Column, String, DateTime, Text, Boolean
-from sqlalchemy.dialects.postgresql import UUID, JSON
+from sqlalchemy import Column, String, DateTime, Text, Boolean, Integer
+from sqlalchemy.dialects.postgresql import UUID, JSON, JSONB
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.database import Base
 import uuid
+
 
 class News(Base):
     __tablename__ = "news"
@@ -21,6 +23,10 @@ class News(Base):
     used_in_social = Column(Boolean, default=False, nullable=False)
     provincia = Column(String, nullable=True)
     poblacion = Column(String, nullable=True)
+    domain = Column(Text, nullable=False, default="real_estate")
+    relevance_score = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+
+    ig_drafts = relationship("IGDraft", back_populates="news", cascade="all, delete-orphan")
 

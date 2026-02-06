@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}{{ news.title[:50] }}{% if news.title|length > 50 %}…{% endif %} - {{ brand_display }}{% endblock %}
+{% block body %}
+<div class="portal theme-{{ brand }}">
+  <header class="portal-header">
+    <div class="container">
+      <div class="header-row">
+        <a href="/ui/{{ brand }}" class="back-link">← Volver</a>
+        <div class="brand-switch">
+          <select onchange="location.href='/ui/'+this.value+'/news/{{ news.id }}'">
+            {% for key, config in brands.items() %}
+            <option value="{{ key }}" {% if key == brand %}selected{% endif %}>{{ config.display }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </div>
+  </header>
+  <main class="portal-main">
+    <div class="container">
+      <div id="toast" class="toast hidden"></div>
+      <article class="news-detail">
+        <h2>{{ news.title }}</h2>
+        <div class="news-meta">
+          <span>{{ news.source }}</span>
+          <span class="badge badge-cat">{{ news.category }}</span>
+          {% if news.relevance_score %}<span>Score {{ news.relevance_score }}</span>{% endif %}
+          <span>{{ news.published_at.strftime('%Y-%m-%d %H:%M') if news.published_at else '' }}</span>
+          <a href="{{ news.url }}" target="_blank" rel="noopener" class="link-source">Fuente ↗</a>
+        </div>
+        {% if news.raw_summary %}
+        <div class="news-summary collapsed" id="summary" data-full="{{ news.raw_summary|e }}">
+          {{ news.raw_summary[:400] }}{% if news.raw_summary|length > 400 %}…{% endif %}
+        </div>
+        <button type="button" class="btn-ver-mas" id="btnVerMas" onclick="toggleSummary()">Ver más</button>
+        {% endif %}
+        <div class="news-actions">
+          <button class="btn-primary btn-generate-ig" data-news-id="{{ news.id }}" title="Crear el primer borrador de IG">Crear IG</button>
+          <button class="btn btn-variants" data-news-id="{{ news.id }}" title="Genera 3 borradores alternativos para elegir el mejor">Generar variantes</button>
+        </div>
+        <p class="news-actions-help">Generar variantes: crea varios borradores con distinto estilo. El número real se muestra al completar.</p>
+        {% if drafts %}
+        <section class="drafts-section">
+          <h3>Borradores ({{ drafts|length }})</h3>
+          <ul>
+            {% for d in drafts %}
+            <li>
+              <a href="/ui/{{ brand }}/draft/{{ d.id }}" title="Abrir para editar">Ver — {{ d.created_at.strftime('%Y-%m-%d %H:%M') }}</a>
+              <span class="badge badge-{{ d.status|lower }}">{{ d.status }}</span>
+            </li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endif %}
+      </article>
+    </div>
+  </main>
+</div>
+<script>
+const brand = "{{ brand }}";
+function showToast(msg, type) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast ' + (type || ''); t.classList.remove('hidden');
+  setTimeout(() => t.classList.add('hidden'), 4000);
+}
+function toggleSummary() {
+  const el = document.getElementById('summary');
+  const btn = document.getElementById('btnVerMas');
+  if (el.classList.contains('collapsed')) {
+    el.textContent = el.dataset.full; el.classList.remove('collapsed'); btn.textContent = 'Ver menos';
+  } else {
+    el.textContent = el.dataset.full.slice(0, 400) + (el.dataset.full.length > 400 ? '…' : ''); el.classList.add('collapsed'); btn.textContent = 'Ver más';
+  }
+}
+document.querySelector('.btn-generate-ig').onclick = async () => {
+  const r = await fetch(`/api/ig/news/{{ news.id }}/generate`, { method: 'POST' });
+  const d = await r.json();
+  if (r.ok) location.href = `/ui/${brand}/draft/${d.id}`;
+  else showToast('Error: ' + (d.detail || 'Unknown'), 'error');
+};
+document.querySelector('.btn-variants').onclick = async () => {
+  const r = await fetch(`/api/ig/news/{{ news.id }}/variants?count=3`, { method: 'POST' });
+  const d = await r.json();
+  if (r.ok) { showToast(d.created + ' variantes creadas', 'success'); setTimeout(() => location.reload(), 1000); }
+  else showToast('Error: ' + (d.detail || 'Unknown'), 'error');
+};
+</script>
+{% endblock %}

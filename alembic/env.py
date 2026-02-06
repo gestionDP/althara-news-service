@@ -16,6 +16,7 @@ if config.config_file_name is not None:
 
 from app.database import Base
 from app.models.news import News
+from app.models.ig_draft import IGDraft
 
 target_metadata = Base.metadata
 

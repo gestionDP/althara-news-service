@@ -7,7 +7,8 @@ avoiding duplicates.
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.ingestion.idealista_client import IdealistaClient, IdealistaNewsItem
-from app.ingestion.rss_ingestor import _is_relevant_to_real_estate
+from app.constants import DENY_KEYWORDS, ALLOW_KEYWORDS, STRICT_REQUIRE_ALLOW
+from app.utils.guardrails import passes_guardrails
 from app.models.news import News
 
 
@@ -29,7 +30,10 @@ async def ingest_idealista_news(session: AsyncSession) -> int:
     
     for item in items:
         # Apply relevance filter - only insert real estate relevant news
-        if not _is_relevant_to_real_estate(item.title, item.raw_summary):
+        if not passes_guardrails(
+            item.title, DENY_KEYWORDS, ALLOW_KEYWORDS, STRICT_REQUIRE_ALLOW,
+            summary=item.raw_summary, url=item.url,
+        ):
             continue
         
         stmt = select(News).where(News.url == item.url)
